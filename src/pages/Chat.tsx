@@ -1,55 +1,28 @@
-import React from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  CircularProgress
-} from '@mui/material';
-import { Message as MessageIcon } from '@mui/icons-material';
+import { Box, Container, VStack, Heading, Text, Card, CardBody, Spinner as ChakraSpinner } from '@chakra-ui/react';
+import { ChatIcon } from '@chakra-ui/icons';
 
 function Chat() {
   return (
-    <Container maxWidth="lg">
-      <Box
-        sx={{
-          mt: 4,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center'
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            width: '100%',
-            borderRadius: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 2
-          }}
-        >
-          <MessageIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-          
-          <Typography variant="h4" component="h1" gutterBottom>
-            Chat Coming Soon
-          </Typography>
-          
-          <Typography variant="body1" color="text.secondary" align="center">
-            We're working on building an amazing chat experience for you.
-            Check back soon!
-          </Typography>
+    <Container maxW="container.lg">
+      <Card mt={8}>
+        <CardBody>
+          <VStack spacing={6} align="center" py={10}>
+            <ChatIcon boxSize={12} color="blue.500" />
+            
+            <Heading>Chat Coming Soon</Heading>
+            
+            <Text color="gray.600" textAlign="center">
+              We're working on building an amazing chat experience for you.
+              Check back soon!
+            </Text>
 
-          <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <CircularProgress size={20} />
-            <Typography variant="body2" color="text.secondary">
-              Setting up chat functionality...
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
+            <Box display="flex" alignItems="center" gap={3}>
+              <ChakraSpinner size="sm" color="blue.500" />
+              <Text color="gray.500">Setting up chat functionality...</Text>
+            </Box>
+          </VStack>
+        </CardBody>
+      </Card>
     </Container>
   );
 }

@@ -1,35 +1,41 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { supabase } from '../config/supabase';
-import debounce from 'lodash/debounce'; // You'll need to install lodash: npm install lodash
+import debounce from 'lodash/debounce';
 import {
-  Container,
   Box,
-  Typography,
-  TextField,
-  Link,
-  Alert,
-  Paper,
-  InputAdornment,
-  IconButton,
+  Button,
+  Container,
   FormControl,
+  FormLabel,
+  Input,
+  VStack,
+  Heading,
+  Text,
+  Link,
+  InputGroup,
+  InputRightElement,
+  Alert,
+  AlertIcon,
   FormHelperText,
-  Stepper,
-  Step,
-  StepLabel,
-  CircularProgress
-} from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+  Card,
+  CardBody,
+  List,
+  ListItem,
+  ListIcon,
+  InputRightAddon,
+  Spinner,
+} from '@chakra-ui/react';
 import { 
-  Visibility, 
-  VisibilityOff,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon 
-} from '@mui/icons-material';
+  ViewIcon, 
+  ViewOffIcon, 
+  CheckIcon, 
+  CloseIcon,
+  InfoIcon 
+} from '@chakra-ui/icons';
 
 function Signup() {
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -40,6 +46,9 @@ function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameError, setUsernameError] = useState('');
 
   // Password validation states
   const [passwordErrors, setPasswordErrors] = useState({
@@ -48,11 +57,6 @@ function Signup() {
     uppercase: false,
     special: false
   });
-
-  // Add these new state variables
-  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
-  const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
-  const [usernameError, setUsernameError] = useState('');
 
   const validatePassword = (password: string) => {
     setPasswordErrors({
@@ -63,9 +67,7 @@ function Signup() {
     });
   };
 
-  // Username validation function
   const validateUsername = (username: string) => {
-    // Basic validation rules
     if (username.length < 3) {
       setUsernameError('Username must be at least 3 characters');
       setIsUsernameAvailable(null);
@@ -84,7 +86,6 @@ function Signup() {
     return true;
   };
 
-  // Debounced function to check username availability
   const checkUsernameAvailability = useCallback(
     debounce(async (username: string) => {
       setIsCheckingUsername(true);
@@ -95,7 +96,7 @@ function Signup() {
           .eq('username', username)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows returned
+        if (error && error.code !== 'PGRST116') {
           throw error;
         }
 
@@ -107,7 +108,7 @@ function Signup() {
       } finally {
         setIsCheckingUsername(false);
       }
-    }, 500), // Wait 500ms after last keystroke before checking
+    }, 500),
     []
   );
 
@@ -132,15 +133,12 @@ function Signup() {
     setError('');
     setLoading(true);
 
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.auth.signUp({
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error('Passwords do not match');
+      }
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -150,25 +148,24 @@ function Signup() {
         }
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
-      // Create a profile in the profiles table
-      if (data.user) {
+      if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
             {
-              id: data.user.id,
+              id: authData.user.id,
               username: formData.username,
               email: formData.email,
             }
           ]);
 
         if (profileError) throw profileError;
-      }
 
-      // After successful signup
-      navigate('/login');
+        alert('Please check your email to confirm your account.');
+        navigate('/login');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
     } finally {
@@ -180,227 +177,137 @@ function Signup() {
     return Object.values(passwordErrors).every(Boolean);
   };
 
-  // Username input end adornment
-  const getUsernameAdornment = () => {
-    if (!formData.username) return null;
-    
-    if (isCheckingUsername) {
-      return (
-        <InputAdornment position="end">
-          <CircularProgress size={20} />
-        </InputAdornment>
-      );
-    }
-
-    if (isUsernameAvailable === true) {
-      return (
-        <InputAdornment position="end">
-          <CheckCircleIcon color="success" />
-        </InputAdornment>
-      );
-    }
-
-    if (isUsernameAvailable === false || usernameError) {
-      return (
-        <InputAdornment position="end">
-          <CancelIcon color="error" />
-        </InputAdornment>
-      );
-    }
-
-    return null;
-  };
-
-  // Update the isFormValid check
-  const isFormValid = () => {
-    return (
-      isPasswordValid() &&
-      formData.email &&
-      formData.username &&
-      isUsernameAvailable &&
-      !isCheckingUsername &&
-      !usernameError
-    );
-  };
-
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center'
-        }}
-      >
-        <Paper 
-          elevation={3} 
-          sx={{
-            p: 4,
-            width: '100%',
-            borderRadius: 2
-          }}
-        >
-          <Typography 
-            component="h1" 
-            variant="h5" 
-            align="center" 
-            gutterBottom
-            sx={{ mb: 3 }}
-          >
-            Create Account
-          </Typography>
-          
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          
-          <Box 
-            component="form" 
-            onSubmit={handleSubmit} 
-            noValidate
-          >
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={formData.username}
-              onChange={handleChange}
-              error={Boolean(usernameError)}
-              helperText={usernameError || (isUsernameAvailable && formData.username ? 'Username is available' : ' ')}
-              InputProps={{
-                endAdornment: getUsernameAdornment(),
-              }}
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              value={formData.email}
-              onChange={handleChange}
-              sx={{ mb: 2 }}
-            />
+    <Container maxW="md" py={12}>
+      <Card>
+        <CardBody>
+          <VStack spacing={8}>
+            <Heading>Create Account</Heading>
             
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <TextField
-                required
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                autoComplete="new-password"
-                value={formData.password}
-                onChange={handleChange}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
+            {error && (
+              <Alert status="error" borderRadius="md">
+                <AlertIcon />
+                {error}
+              </Alert>
+            )}
+            
+            <Box as="form" onSubmit={handleSubmit} width="100%">
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Username</FormLabel>
+                  <InputGroup>
+                    <Input
+                      name="username"
+                      value={formData.username}
+                      onChange={handleChange}
+                      placeholder="Choose a username"
+                      isInvalid={Boolean(usernameError)}
+                    />
+                    <InputRightAddon>
+                      {isCheckingUsername ? (
+                        <Spinner size="sm" />
+                      ) : isUsernameAvailable ? (
+                        <CheckIcon color="green.500" />
+                      ) : usernameError ? (
+                        <CloseIcon color="red.500" />
+                      ) : null}
+                    </InputRightAddon>
+                  </InputGroup>
+                  {usernameError && (
+                    <FormHelperText color="red.500">{usernameError}</FormHelperText>
+                  )}
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Email</FormLabel>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Password</FormLabel>
+                  <InputGroup>
+                    <Input
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Create a password"
+                    />
+                    <InputRightElement width="4.5rem">
+                      <Button
+                        h="1.75rem"
+                        size="sm"
                         onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
+                        variant="ghost"
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <FormHelperText>
-                Password must:
-                <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                  <li style={{ color: passwordErrors.length ? 'green' : 'inherit' }}>
-                    Be at least 8 characters
-                  </li>
-                  <li style={{ color: passwordErrors.number ? 'green' : 'inherit' }}>
-                    Include a number
-                  </li>
-                  <li style={{ color: passwordErrors.uppercase ? 'green' : 'inherit' }}>
-                    Include an uppercase letter
-                  </li>
-                  <li style={{ color: passwordErrors.special ? 'green' : 'inherit' }}>
-                    Include a special character
-                  </li>
-                </Box>
-              </FormHelperText>
-            </FormControl>
+                        {showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                      </Button>
+                    </InputRightElement>
+                  </InputGroup>
+                  <List spacing={1} mt={2}>
+                    {Object.entries(passwordErrors).map(([key, valid]) => (
+                      <ListItem key={key} color={valid ? 'green.500' : 'gray.500'}>
+                        <ListIcon as={valid ? CheckIcon : InfoIcon} />
+                        {key === 'length' && 'At least 8 characters'}
+                        {key === 'number' && 'Contains a number'}
+                        {key === 'uppercase' && 'Contains an uppercase letter'}
+                        {key === 'special' && 'Contains a special character'}
+                      </ListItem>
+                    ))}
+                  </List>
+                </FormControl>
 
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="confirmPassword"
-              label="Confirm Password"
-              type={showConfirmPassword ? 'text' : 'password'}
-              id="confirmPassword"
-              autoComplete="new-password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      edge="end"
-                    >
-                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ mb: 3 }}
-            />
+                <FormControl isRequired>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <InputGroup>
+                    <Input
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Confirm your password"
+                    />
+                    <InputRightElement width="4.5rem">
+                      <Button
+                        h="1.75rem"
+                        size="sm"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        variant="ghost"
+                      >
+                        {showConfirmPassword ? <ViewOffIcon /> : <ViewIcon />}
+                      </Button>
+                    </InputRightElement>
+                  </InputGroup>
+                </FormControl>
 
-            <LoadingButton
-              type="submit"
-              fullWidth
-              variant="contained"
-              loading={loading}
-              disabled={!isFormValid()}
-              sx={{ 
-                mt: 2, 
-                mb: 3,
-                py: 1.5,
-                fontSize: '1rem'
-              }}
-            >
-              Create Account
-            </LoadingButton>
+                <Button
+                  type="submit"
+                  colorScheme="blue"
+                  width="100%"
+                  isLoading={loading}
+                  loadingText="Creating Account"
+                  isDisabled={!isPasswordValid() || !isUsernameAvailable || !formData.email}
+                >
+                  Sign Up
+                </Button>
+              </VStack>
+            </Box>
 
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 1
-            }}>
-              <Typography variant="body2" color="text.secondary">
-                Already have an account?
-              </Typography>
-              <Link 
-                component={RouterLink} 
-                to="/login" 
-                variant="body2"
-                sx={{ fontWeight: 500 }}
-              >
+            <Text>
+              Already have an account?{' '}
+              <Link as={RouterLink} to="/login" color="blue.500">
                 Log In
               </Link>
-            </Box>
-          </Box>
-        </Paper>
-      </Box>
+            </Text>
+          </VStack>
+        </CardBody>
+      </Card>
     </Container>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, AppBar, Toolbar, Typography, Container } from '@mui/material';
+import { Box, Container } from '@chakra-ui/react';
 import { useLocation } from 'react-router-dom';
 
 interface LayoutProps {
@@ -16,16 +16,8 @@ function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Chat App
-          </Typography>
-          {/* Add navigation items here later */}
-        </Toolbar>
-      </AppBar>
-      <Container component="main" sx={{ flex: 1, py: 3 }}>
+    <Box minH="100vh">
+      <Container maxW="container.xl" py={4}>
         {children}
       </Container>
     </Box>
