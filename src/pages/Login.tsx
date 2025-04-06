@@ -61,10 +61,10 @@ function Login() {
   };
 
   return (
-    <Container maxW="md" py={12}>
+    <Container maxW="container.sm" py={8}>
       <Card>
         <CardBody>
-          <VStack spacing={8}>
+          <VStack spacing={6} align="stretch">
             <Heading>Welcome Back</Heading>
             
             {error && (
@@ -122,12 +122,29 @@ function Login() {
               </VStack>
             </Box>
 
-            <Text>
-              Don't have an account?{' '}
-              <Link as={RouterLink} to="/signup" color="blue.500">
-                Sign Up
-              </Link>
-            </Text>
+            <VStack spacing={2} pt={4}>
+              <Text textAlign="center">
+                Don't have an account?
+              </Text>
+              <Button
+                as={RouterLink}
+                to="/member-signup"
+                colorScheme="blue"
+                variant="outline"
+                width="full"
+              >
+                Sign up as Member
+              </Button>
+              <Button
+                as={RouterLink}
+                to="/creator-signup"
+                colorScheme="purple"
+                variant="outline"
+                width="full"
+              >
+                Sign up as Creator
+              </Button>
+            </VStack>
           </VStack>
         </CardBody>
       </Card>

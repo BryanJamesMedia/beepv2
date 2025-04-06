@@ -10,4 +10,13 @@ export interface PasswordErrors {
   number: boolean;
   uppercase: boolean;
   special: boolean;
+}
+
+export type UserRole = 'creator' | 'member';
+
+export interface UserProfile {
+  id: string;
+  role: UserRole;
+  username: string;
+  // Add other profile fields as needed
 } 
