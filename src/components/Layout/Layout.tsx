@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Container } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
+import BottomNav from '../Navigation/BottomNav';
 import { useLocation } from 'react-router-dom';
 
 interface LayoutProps {
@@ -8,18 +9,14 @@ interface LayoutProps {
 
 function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const isAuthPage = ['/login', '/signup'].includes(location.pathname);
-
-  // Don't show header on auth pages
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
+  const isAuthPage = ['/login', '/signup', '/creator-signup', '/member-signup'].includes(location.pathname);
 
   return (
-    <Box minH="100vh">
-      <Container maxW="container.xl" py={4}>
+    <Box minH="100vh" bg="gray.50">
+      <Box pb={isAuthPage ? 0 : "60px"}>
         {children}
-      </Container>
+      </Box>
+      {!isAuthPage && <BottomNav />}
     </Box>
   );
 }

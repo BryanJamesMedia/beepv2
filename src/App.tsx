@@ -11,70 +11,93 @@ import MemberSettings from './pages/MemberSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import CreatorSignup from './pages/CreatorSignup';
 import MemberSignup from './pages/MemberSignup';
+import ChatList from './components/ChatList/ChatList';
+import { AblyProvider } from './contexts/AblyContext';
+import ChatPage from './pages/Chat/ChatPage';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Settings from './pages/Settings/Settings';
 
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/creator-signup" element={<CreatorSignup />} />
-          <Route path="/member-signup" element={<MemberSignup />} />
+      <AblyProvider>
+        <Layout>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/creator-signup" element={<CreatorSignup />} />
+            <Route path="/member-signup" element={<MemberSignup />} />
 
-          {/* Creator-only routes */}
-          <Route 
-            path="/creator-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['creator']}>
-                <CreatorDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/creator-settings" 
-            element={
-              <ProtectedRoute allowedRoles={['creator']}>
-                <CreatorSettings />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Protected routes */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/chat" 
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } 
+            />
 
-          {/* Member-only routes */}
-          <Route 
-            path="/member-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['member']}>
-                <MemberDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/member-settings" 
-            element={
-              <ProtectedRoute allowedRoles={['member']}>
-                <MemberSettings />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Creator-only routes */}
+            <Route 
+              path="/creator-dashboard" 
+              element={
+                <ProtectedRoute allowedRoles={['creator']}>
+                  <CreatorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator-settings" 
+              element={
+                <ProtectedRoute allowedRoles={['creator']}>
+                  <CreatorSettings />
+                </ProtectedRoute>
+              } 
+            />
 
-          {/* Shared routes (accessible by both roles) */}
-          <Route 
-            path="/chat" 
-            element={
-              <ProtectedRoute allowedRoles={['creator', 'member']}>
-                <Chat />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Member-only routes */}
+            <Route 
+              path="/member-dashboard" 
+              element={
+                <ProtectedRoute allowedRoles={['member']}>
+                  <MemberDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/member-settings" 
+              element={
+                <ProtectedRoute allowedRoles={['member']}>
+                  <MemberSettings />
+                </ProtectedRoute>
+              } 
+            />
 
-          {/* Root redirect */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Layout>
+            {/* Default route */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Catch all */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Layout>
+      </AblyProvider>
     </BrowserRouter>
   );
 }
