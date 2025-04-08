@@ -1,15 +1,47 @@
-import React from 'react';
-import { Box, Container, Heading } from '@chakra-ui/react';
+import React, { useEffect, useState } from 'react';
+import { Box, Spinner, Center } from '@chakra-ui/react';
+import { supabase } from '../../config/supabase';
+import CreatorSettings from './CreatorSettings';
+import MemberSettings from './MemberSettings';
 
 function Settings() {
-  return (
-    <Container maxW="container.lg" py={6}>
-      <Box>
-        <Heading size="lg">Settings</Heading>
-        {/* Add your settings content here */}
-      </Box>
-    </Container>
-  );
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function getUserRole() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (error) throw error;
+          setUserRole(profile.role);
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getUserRole();
+  }, []);
+
+  if (loading) {
+    return (
+      <Center h="calc(100vh - 60px)">
+        <Spinner size="xl" />
+      </Center>
+    );
+  }
+
+  return userRole === 'creator' ? <CreatorSettings /> : <MemberSettings />;
 }
 
 export default Settings; 
