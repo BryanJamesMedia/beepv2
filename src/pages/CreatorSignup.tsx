@@ -18,7 +18,6 @@ import {
   AlertIcon,
   Card,
   CardBody,
-  FormHelperText,
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 
@@ -29,8 +28,6 @@ function CreatorSignup() {
     password: '',
     confirmPassword: '',
     username: '',
-    creatorName: '', // Additional field for creators
-    bio: '', // Additional field for creators
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -72,8 +69,6 @@ function CreatorSignup() {
             {
               id: authData.user.id,
               username: formData.username,
-              creator_name: formData.creatorName,
-              bio: formData.bio,
               role: 'creator',
               created_at: new Date(),
             }
@@ -122,29 +117,6 @@ function CreatorSignup() {
                     value={formData.username}
                     onChange={handleChange}
                     placeholder="Choose a unique username"
-                  />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Creator Name</FormLabel>
-                  <Input
-                    name="creatorName"
-                    value={formData.creatorName}
-                    onChange={handleChange}
-                    placeholder="Your creator/brand name"
-                  />
-                  <FormHelperText>
-                    This is how you'll be known to your community
-                  </FormHelperText>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Bio</FormLabel>
-                  <Input
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    placeholder="Tell us about yourself"
                   />
                 </FormControl>
 
