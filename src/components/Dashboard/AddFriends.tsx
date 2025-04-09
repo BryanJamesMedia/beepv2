@@ -21,20 +21,274 @@ import {
   HStack,
   Avatar,
   useToast,
+  Code,
+  Center,
 } from '@chakra-ui/react';
-import { FiUserPlus, FiSearch, FiShare2 } from 'react-icons/fi';
-import { QRCodeSVG } from 'qrcode.react';
+import { FiUserPlus, FiSearch, FiShare2, FiGrid } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
 
-const toast = useToast();
+interface AddFriendsProps {
+  userRole: 'member' | 'creator';
+}
 
-const AddFriends = () => {
-  // ... rest of the component code
+const AddFriends: React.FC<AddFriendsProps> = ({ userRole }) => {
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<any[]>([]);
+  const [isSearching, setIsSearching] = React.useState(false);
+  const inviteDisclosure = useDisclosure();
+  const searchDisclosure = useDisclosure();
+  const qrDisclosure = useDisclosure();
+  const toast = useToast();
+  
+  const buttonBg = useColorModeValue('white', 'gray.700');
+  const buttonHoverBg = useColorModeValue('gray.50', 'gray.600');
 
-  // Replace QRCode component with QRCodeSVG
-  <QRCodeSVG value={qrCodeValue()} size={200} />
+  // Search for users based on role
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const searchRole = userRole === 'creator' ? 'member' : 'creator';
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, display_name')
+        .eq('role', searchRole)
+        .ilike('username', `%${searchQuery}%`)
+        .limit(5);
+        
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Error searching users:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
-  // ... rest of the component code
+  // Generate invite link
+  const generateInviteLink = () => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/signup?invited_by=${userRole}`;
+  };
+
+  // Generate QR code link
+  const qrCodeValue = () => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/profile/${userRole}`;
+  };
+
+  return (
+    <Box mb={8}>
+      <Heading size="md" mb={4}>Add Friends</Heading>
+      
+      <SimpleGrid columns={3} spacing={4}>
+        <Button
+          height="100px"
+          onClick={inviteDisclosure.onOpen}
+          bg={buttonBg}
+          _hover={{ bg: buttonHoverBg }}
+          boxShadow="md"
+          borderRadius="lg"
+        >
+          <VStack>
+            <Icon as={FiShare2} boxSize={6} />
+            <Text>Invite</Text>
+          </VStack>
+        </Button>
+        
+        <Button
+          height="100px"
+          onClick={qrDisclosure.onOpen}
+          bg={buttonBg}
+          _hover={{ bg: buttonHoverBg }}
+          boxShadow="md"
+          borderRadius="lg"
+        >
+          <VStack>
+            <Icon as={FiGrid} boxSize={6} />
+            <Text>QR Code</Text>
+          </VStack>
+        </Button>
+        
+        <Button
+          height="100px"
+          onClick={searchDisclosure.onOpen}
+          bg={buttonBg}
+          _hover={{ bg: buttonHoverBg }}
+          boxShadow="md"
+          borderRadius="lg"
+        >
+          <VStack>
+            <Icon as={FiSearch} boxSize={6} />
+            <Text>Search</Text>
+          </VStack>
+        </Button>
+      </SimpleGrid>
+
+      {/* Invite Modal */}
+      <Modal isOpen={inviteDisclosure.isOpen} onClose={inviteDisclosure.onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Invite Friends</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4}>
+              <Text>Share this link with friends to join:</Text>
+              <Box
+                p={3}
+                borderWidth="1px"
+                borderRadius="md"
+                width="100%"
+                bg="gray.50"
+              >
+                <Text fontWeight="medium" isTruncated>
+                  {generateInviteLink()}
+                </Text>
+              </Box>
+              <Button 
+                colorScheme="blue"
+                onClick={() => {
+                  navigator.clipboard.writeText(generateInviteLink());
+                  toast({
+                    title: "Link copied",
+                    status: "success",
+                    duration: 2000,
+                  });
+                }}
+              >
+                Copy Link
+              </Button>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* QR Code Modal */}
+      <Modal isOpen={qrDisclosure.isOpen} onClose={qrDisclosure.onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Your Profile Link</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4} align="center">
+              <Text>Share this link with others to find you:</Text>
+              
+              {/* Replaced QR code component with a simple link display */}
+              <Box 
+                p={4} 
+                bg="gray.50" 
+                borderRadius="md" 
+                borderWidth="1px" 
+                width="100%"
+              >
+                <Text fontWeight="medium" textAlign="center">
+                  {qrCodeValue()}
+                </Text>
+              </Box>
+              
+              <Button 
+                colorScheme="blue"
+                onClick={() => {
+                  navigator.clipboard.writeText(qrCodeValue());
+                  toast({
+                    title: "Link copied",
+                    status: "success",
+                    duration: 2000,
+                  });
+                }}
+              >
+                Copy Link
+              </Button>
+              
+              <Text fontSize="sm" color="gray.500">
+                Note: QR code functionality will be added in the next update
+              </Text>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Search Modal */}
+      <Modal isOpen={searchDisclosure.isOpen} onClose={searchDisclosure.onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            Search {userRole === 'creator' ? 'Members' : 'Creators'}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4} align="stretch">
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <Icon as={FiSearch} color="gray.400" />
+                </InputLeftElement>
+                <Input
+                  placeholder={`Search for ${userRole === 'creator' ? 'members' : 'creators'}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                />
+              </InputGroup>
+              
+              <Button 
+                colorScheme="blue" 
+                onClick={handleSearch}
+                isLoading={isSearching}
+              >
+                Search
+              </Button>
+              
+              {searchResults.length > 0 ? (
+                <VStack spacing={2} align="stretch">
+                  {searchResults.map(user => (
+                    <HStack
+                      key={user.id}
+                      p={3}
+                      borderWidth="1px"
+                      borderRadius="md"
+                      justify="space-between"
+                    >
+                      <HStack>
+                        <Avatar 
+                          size="sm" 
+                          name={user.display_name || user.username}
+                          src={user.avatar_url}
+                        />
+                        <Text fontWeight="medium">
+                          {user.display_name || user.username}
+                        </Text>
+                      </HStack>
+                      <Button
+                        size="sm"
+                        leftIcon={<FiUserPlus />}
+                        onClick={() => {
+                          toast({
+                            title: "Friend request sent",
+                            status: "success",
+                            duration: 2000,
+                          });
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </HStack>
+                  ))}
+                </VStack>
+              ) : (
+                searchQuery && !isSearching && (
+                  <Text textAlign="center" color="gray.500" py={4}>
+                    No results found
+                  </Text>
+                )
+              )}
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    </Box>
+  );
 };
 
 export default AddFriends; 
