@@ -13,6 +13,7 @@ import {
   Divider,
   useToast,
 } from '@chakra-ui/react';
+import { CreatorProfileSettings } from './sections/CreatorProfileSettings';
 
 function CreatorSettings() {
   const toast = useToast();
@@ -21,7 +22,7 @@ function CreatorSettings() {
     <Container maxW="container.md" py={6}>
       <VStack spacing={6} align="stretch">
         <Heading size="lg">Creator Settings</Heading>
-
+        <CreatorProfileSettings />
         <Card>
           <CardBody>
             <VStack spacing={6} align="stretch">

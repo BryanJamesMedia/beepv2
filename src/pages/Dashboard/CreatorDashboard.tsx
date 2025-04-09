@@ -14,11 +14,13 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
+import TopMenu from '../../components/TopMenu';
 
 function CreatorDashboard() {
   return (
-    <Container maxW="container.lg" py={6}>
+    <Container maxW="container.xl" py={6}>
       <VStack spacing={6} align="stretch">
+        <TopMenu />
         <Heading size="lg">Creator Dashboard</Heading>
 
         <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>

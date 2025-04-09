@@ -18,11 +18,13 @@ import {
   DrawerContent,
   DrawerCloseButton,
   useDisclosure,
+  Button,
 } from '@chakra-ui/react';
-import { FiUser, FiSettings, FiLock, FiUsers, FiBell, FiHelpCircle, FiMenu } from 'react-icons/fi';
+import { FiUser, FiSettings, FiLock, FiUsers, FiBell, FiHelpCircle, FiMenu, FiLogOut } from 'react-icons/fi';
 import { BiWallet, BiQr } from 'react-icons/bi';
 import { MdPayment } from 'react-icons/md';
 import { ProfileSettings } from './sections/ProfileSettings';
+import { logout } from '../../utils/auth';
 
 // Define the menu items and their icons
 const menuItems = [
@@ -72,6 +74,15 @@ function MemberSettings() {
           </HStack>
         </Box>
       ))}
+      <Divider />
+      <Button
+        leftIcon={<FiLogOut />}
+        variant="ghost"
+        justifyContent="flex-start"
+        onClick={logout}
+      >
+        Logout
+      </Button>
     </VStack>
   );
 

@@ -11,11 +11,13 @@ import {
   Badge,
   HStack,
 } from '@chakra-ui/react';
+import TopMenu from '../../components/TopMenu';
 
 function MemberDashboard() {
   return (
-    <Container maxW="container.lg" py={6}>
+    <Container maxW="container.xl" py={6}>
       <VStack spacing={6} align="stretch">
+        <TopMenu />
         <Heading size="lg">Member Dashboard</Heading>
 
         <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
