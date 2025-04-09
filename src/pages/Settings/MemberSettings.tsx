@@ -11,16 +11,13 @@ import {
   useColorModeValue,
   useBreakpointValue,
   IconButton,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useDisclosure,
+  SimpleGrid,
   Button,
+  Card,
+  CardBody,
+  Center,
 } from '@chakra-ui/react';
-import { FiUser, FiSettings, FiLock, FiUsers, FiBell, FiHelpCircle, FiMenu, FiLogOut } from 'react-icons/fi';
+import { FiUser, FiSettings, FiLock, FiUsers, FiBell, FiHelpCircle, FiChevronLeft, FiLogOut } from 'react-icons/fi';
 import { BiWallet, BiQr } from 'react-icons/bi';
 import { MdPayment } from 'react-icons/md';
 import { ProfileSettings } from './sections/ProfileSettings';
@@ -40,16 +37,16 @@ const menuItems = [
 ];
 
 function MemberSettings() {
-  const [activeSection, setActiveSection] = useState('profile');
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const isMobile = useBreakpointValue({ base: true, md: false });
   
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
   const activeBg = useColorModeValue('blue.50', 'blue.900');
   const activeColor = useColorModeValue('blue.600', 'blue.200');
+  const cardBg = useColorModeValue('white', 'gray.700');
 
-  const MenuItems = () => (
+  const DesktopMenuItems = () => (
     <VStack align="stretch" spacing={1}>
       {menuItems.map((item) => (
         <Box
@@ -59,10 +56,7 @@ function MemberSettings() {
           borderRadius="md"
           bg={activeSection === item.id ? activeBg : 'transparent'}
           color={activeSection === item.id ? activeColor : 'inherit'}
-          onClick={() => {
-            setActiveSection(item.id);
-            if (isMobile) onClose();
-          }}
+          onClick={() => setActiveSection(item.id)}
           _hover={{ bg: activeSection === item.id ? activeBg : hoverBg }}
           transition="all 0.2s"
         >
@@ -86,11 +80,52 @@ function MemberSettings() {
     </VStack>
   );
 
+  const MobileMenuGrid = () => (
+    <VStack spacing={6} align="stretch">
+      <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={4}>
+        {menuItems.map((item) => (
+          <Card 
+            key={item.id}
+            bg={cardBg}
+            boxShadow="md"
+            borderRadius="lg"
+            overflow="hidden"
+            cursor="pointer"
+            onClick={() => setActiveSection(item.id)}
+            _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg' }}
+            transition="all 0.2s"
+          >
+            <CardBody>
+              <Center flexDirection="column" textAlign="center" py={2}>
+                <Icon 
+                  as={item.icon} 
+                  boxSize={8} 
+                  mb={2}
+                  color={activeColor}
+                />
+                <Text fontWeight="medium">{item.label}</Text>
+              </Center>
+            </CardBody>
+          </Card>
+        ))}
+      </SimpleGrid>
+      
+      <Button
+        leftIcon={<FiLogOut />}
+        colorScheme="red"
+        variant="outline"
+        w="full"
+        onClick={logout}
+        mt={4}
+      >
+        Logout
+      </Button>
+    </VStack>
+  );
+
   const renderContent = () => {
-    console.log('renderContent called, activeSection:', activeSection);
     switch(activeSection) {
       case 'profile':
-        console.log('Rendering ProfileSettings component');
         return <ProfileSettings />;
       // Add other cases for different sections
       default:
@@ -104,70 +139,82 @@ function MemberSettings() {
 
   return (
     <Container maxW="container.xl" py={6}>
-      {/* Mobile Header */}
+      {/* Mobile View */}
       {isMobile && (
-        <HStack mb={6} justify="space-between">
-          <Heading size="lg">{menuItems.find(item => item.id === activeSection)?.label}</Heading>
-          <IconButton
-            aria-label="Open menu"
-            icon={<FiMenu />}
-            onClick={onOpen}
-            variant="ghost"
-          />
-        </HStack>
+        <>
+          {/* Section View with Back Button */}
+          {activeSection ? (
+            <>
+              <HStack mb={6} spacing={4} align="center">
+                <IconButton
+                  aria-label="Back to menu"
+                  icon={<FiChevronLeft />}
+                  variant="ghost"
+                  onClick={() => setActiveSection(null)}
+                />
+                <Heading size="lg">
+                  {menuItems.find(item => item.id === activeSection)?.label}
+                </Heading>
+              </HStack>
+              
+              <Box
+                bg="white"
+                borderRadius="lg"
+                p={6}
+                boxShadow="sm"
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
+                {renderContent()}
+              </Box>
+            </>
+          ) : (
+            /* Menu Grid View */
+            <>
+              <Heading mb={6}>Settings</Heading>
+              <MobileMenuGrid />
+            </>
+          )}
+        </>
       )}
 
-      {/* Desktop Header */}
-      {!isMobile && <Heading mb={6}>Member Settings</Heading>}
-
-      {/* Mobile Drawer */}
-      <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerHeader>Settings Menu</DrawerHeader>
-          <DrawerCloseButton />
-          <DrawerBody>
-            <MenuItems />
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-
       {/* Desktop Layout */}
-      <HStack align="start" spacing={8}>
-        {/* Settings Menu - Only show on desktop */}
-        {!isMobile && (
-          <Box
-            w="250px"
-            borderRight="1px"
-            borderColor={borderColor}
-            pr={4}
-            position="sticky"
-            top="20px"
-          >
-            <MenuItems />
-          </Box>
-        )}
+      {!isMobile && (
+        <>
+          <Heading mb={6}>Member Settings</Heading>
+          <HStack align="start" spacing={8}>
+            {/* Settings Menu */}
+            <Box
+              w="250px"
+              borderRight="1px"
+              borderColor={borderColor}
+              pr={4}
+              position="sticky"
+              top="20px"
+            >
+              <DesktopMenuItems />
+            </Box>
 
-        {/* Settings Content */}
-        <Box flex="1">
-          <Box
-            bg="white"
-            borderRadius="lg"
-            p={6}
-            boxShadow="sm"
-            borderWidth="1px"
-            borderColor={borderColor}
-          >
-            {!isMobile && (
-              <Heading size="md" mb={6}>
-                {menuItems.find(item => item.id === activeSection)?.label}
-              </Heading>
-            )}
-            
-            {renderContent()}
-          </Box>
-        </Box>
-      </HStack>
+            {/* Settings Content */}
+            <Box flex="1">
+              <Box
+                bg="white"
+                borderRadius="lg"
+                p={6}
+                boxShadow="sm"
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
+                <Heading size="md" mb={6}>
+                  {menuItems.find(item => item.id === activeSection)?.label || "Select a section"}
+                </Heading>
+                
+                {renderContent()}
+              </Box>
+            </Box>
+          </HStack>
+        </>
+      )}
     </Container>
   );
 }
