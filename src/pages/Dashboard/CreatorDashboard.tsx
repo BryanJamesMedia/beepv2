@@ -17,17 +17,20 @@ import {
   Text,
   Divider,
   Center,
+  Skeleton,
+  SkeletonCircle,
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
 import TopMenu from '../../components/TopMenu';
 import AddFriends from '../../components/Dashboard/AddFriends';
 import { supabase } from '../../config/supabase';
 import { FiMessageSquare } from 'react-icons/fi';
+import useCustomToast from '../../hooks/useCustomToast';
 
 function CreatorDashboard() {
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const toast = useToast();
+  const toast = useCustomToast();
 
   useEffect(() => {
     fetchFriends();

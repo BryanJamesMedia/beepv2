@@ -20,12 +20,12 @@ import {
   InputLeftElement,
   HStack,
   Avatar,
-  useToast,
   Code,
   Center,
 } from '@chakra-ui/react';
 import { FiUserPlus, FiSearch, FiShare2, FiGrid } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
+import useCustomToast from '../../hooks/useCustomToast';
 
 interface AddFriendsProps {
   userRole: 'member' | 'creator';
@@ -38,7 +38,7 @@ const AddFriends: React.FC<AddFriendsProps> = ({ userRole }) => {
   const inviteDisclosure = useDisclosure();
   const searchDisclosure = useDisclosure();
   const qrDisclosure = useDisclosure();
-  const toast = useToast();
+  const toast = useCustomToast();
   
   const buttonBg = useColorModeValue('white', 'gray.700');
   const buttonHoverBg = useColorModeValue('gray.50', 'gray.600');

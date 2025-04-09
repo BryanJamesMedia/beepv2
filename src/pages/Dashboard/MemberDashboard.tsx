@@ -13,7 +13,6 @@ import {
   Avatar,
   Divider,
   Button,
-  useToast,
   Skeleton,
   SkeletonCircle,
   Center,
@@ -22,11 +21,12 @@ import TopMenu from '../../components/TopMenu';
 import AddFriends from '../../components/Dashboard/AddFriends';
 import { FiMessageSquare } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
+import useCustomToast from '../../hooks/useCustomToast';
 
 function MemberDashboard() {
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const toast = useToast();
+  const toast = useCustomToast();
 
   useEffect(() => {
     fetchFriends();
