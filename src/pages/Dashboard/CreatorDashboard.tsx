@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -12,28 +12,79 @@ import {
   Heading,
   Button,
   VStack,
+  HStack,
+  Avatar,
+  Text,
+  Divider,
+  Center,
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
 import TopMenu from '../../components/TopMenu';
 import AddFriends from '../../components/Dashboard/AddFriends';
+import { supabase } from '../../config/supabase';
+import { FiMessageSquare } from 'react-icons/fi';
 
 function CreatorDashboard() {
+  const [friends, setFriends] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const toast = useToast();
+
+  useEffect(() => {
+    fetchFriends();
+  }, []);
+
+  const fetchFriends = async () => {
+    try {
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('friends')
+        .select(`
+          member_id,
+          member:member_id(id, username, display_name, avatar_url)
+        `)
+        .eq('creator_id', session.user.id);
+
+      if (error) throw error;
+      setFriends(data || []);
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+      toast({
+        title: 'Error loading friends',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startChat = (friendId) => {
+    // Logic to start a chat with a friend
+    console.log('Starting chat with:', friendId);
+    // Navigate to chat page with this friend
+  };
+
   return (
     <Container maxW="container.xl" py={6}>
-      <VStack spacing={6} align="stretch">
+      <VStack spacing={8} align="stretch">
         <TopMenu />
         <Heading size="lg">Creator Dashboard</Heading>
         
         {/* Add Friends Section */}
         <AddFriends userRole="creator" />
 
+        {/* Earnings Stats */}
         <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Total Members</StatLabel>
-                <StatNumber>0</StatNumber>
-                <StatHelpText>Active community members</StatHelpText>
+                <StatLabel>Today's Earnings</StatLabel>
+                <StatNumber>$0.00</StatNumber>
+                <StatHelpText>From all sources</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -41,9 +92,9 @@ function CreatorDashboard() {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Messages Today</StatLabel>
-                <StatNumber>0</StatNumber>
-                <StatHelpText>Across all channels</StatHelpText>
+                <StatLabel>Total Balance</StatLabel>
+                <StatNumber>$0.00</StatNumber>
+                <StatHelpText>Available for withdrawal</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -51,13 +102,75 @@ function CreatorDashboard() {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Active Channels</StatLabel>
-                <StatNumber>0</StatNumber>
-                <StatHelpText>Chat channels</StatHelpText>
+                <StatLabel>Lifetime Earnings</StatLabel>
+                <StatNumber>$0.00</StatNumber>
+                <StatHelpText>All time earnings</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
         </Grid>
+
+        {/* Friends List */}
+        <Box>
+          <Heading size="md" mb={4}>Members</Heading>
+          <Card>
+            <CardBody>
+              {isLoading ? (
+                // Loading skeletons
+                Array(3).fill(0).map((_, i) => (
+                  <Box key={i} mb={i < 2 ? 4 : 0}>
+                    <HStack>
+                      <SkeletonCircle size="50px" />
+                      <Box flex="1">
+                        <Skeleton height="20px" width="40%" mb={2} />
+                        <Skeleton height="16px" width="60%" />
+                      </Box>
+                      <Skeleton height="40px" width="100px" />
+                    </HStack>
+                    {i < 2 && <Divider my={4} />}
+                  </Box>
+                ))
+              ) : friends.length > 0 ? (
+                // Friends list
+                friends.map((friend, index) => (
+                  <Box key={friend.member_id}>
+                    <HStack justify="space-between" align="center">
+                      <HStack>
+                        <Avatar 
+                          size="md" 
+                          name={friend.member.display_name || friend.member.username} 
+                          src={friend.member.avatar_url}
+                        />
+                        <Box>
+                          <Text fontWeight="bold">
+                            {friend.member.display_name || friend.member.username}
+                          </Text>
+                          <Text fontSize="sm" color="gray.500">Member</Text>
+                        </Box>
+                      </HStack>
+                      <Button 
+                        leftIcon={<FiMessageSquare />} 
+                        colorScheme="blue" 
+                        size="sm"
+                        onClick={() => startChat(friend.member_id)}
+                      >
+                        Chat
+                      </Button>
+                    </HStack>
+                    {index < friends.length - 1 && <Divider my={4} />}
+                  </Box>
+                ))
+              ) : (
+                // Empty state
+                <Center py={8}>
+                  <Text color="gray.500">
+                    No members added yet. Use the options above to find members.
+                  </Text>
+                </Center>
+              )}
+            </CardBody>
+          </Card>
+        </Box>
 
         <Card>
           <CardBody>
