@@ -15,6 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
 import TopMenu from '../../components/TopMenu';
+import AddFriends from '../../components/Dashboard/AddFriends';
 
 function CreatorDashboard() {
   return (
@@ -22,6 +23,9 @@ function CreatorDashboard() {
       <VStack spacing={6} align="stretch">
         <TopMenu />
         <Heading size="lg">Creator Dashboard</Heading>
+        
+        {/* Add Friends Section */}
+        <AddFriends userRole="creator" />
 
         <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
           <Card>

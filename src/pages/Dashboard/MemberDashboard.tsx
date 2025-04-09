@@ -12,6 +12,7 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import TopMenu from '../../components/TopMenu';
+import AddFriends from '../../components/Dashboard/AddFriends';
 
 function MemberDashboard() {
   return (
@@ -19,6 +20,8 @@ function MemberDashboard() {
       <VStack spacing={6} align="stretch">
         <TopMenu />
         <Heading size="lg">Member Dashboard</Heading>
+
+        <AddFriends userRole="member" />
 
         <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
           <Card>
