@@ -79,6 +79,62 @@ const AddFriends: React.FC<AddFriendsProps> = ({ userRole }) => {
     return `${baseUrl}/profile/${userRole}`;
   };
 
+  // Add a function to handle adding friends
+  const addFriend = async (userId) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Determine which ID goes where based on user role
+      const friendData = userRole === 'creator' 
+        ? { creator_id: session.user.id, member_id: userId }
+        : { member_id: session.user.id, creator_id: userId };
+
+      // Check if this relationship already exists
+      const { data: existingFriend, error: checkError } = await supabase
+        .from('friends')
+        .select('id')
+        .eq('creator_id', friendData.creator_id)
+        .eq('member_id', friendData.member_id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      // If relationship already exists, notify user
+      if (existingFriend) {
+        toast({
+          title: "Already connected",
+          status: "info",
+          duration: 2000,
+        });
+        return;
+      }
+
+      // Insert the new friend relationship
+      const { error } = await supabase
+        .from('friends')
+        .insert([friendData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Friend added successfully",
+        status: "success",
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error('Error adding friend:', error);
+      toast({
+        title: "Error adding friend",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+    }
+  };
+
   return (
     <Box mb={8}>
       <Heading size="md" mb={4}>Add Friends</Heading>
@@ -263,13 +319,8 @@ const AddFriends: React.FC<AddFriendsProps> = ({ userRole }) => {
                       <Button
                         size="sm"
                         leftIcon={<FiUserPlus />}
-                        onClick={() => {
-                          toast({
-                            title: "Friend request sent",
-                            status: "success",
-                            duration: 2000,
-                          });
-                        }}
+                        onClick={() => addFriend(user.id)}
+                        isLoading={isAddingFriend}
                       >
                         Add
                       </Button>

@@ -41,8 +41,31 @@ function CreatorDashboard() {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session) return;
+      if (!session) {
+        console.log("No session found");
+        return;
+      }
 
+      console.log("User ID:", session.user.id);
+
+      // First check if the table exists by trying to get its schema
+      const { error: tableCheckError } = await supabase
+        .from('friends')
+        .select('id')
+        .limit(1);
+
+      if (tableCheckError) {
+        console.error("Table check error:", tableCheckError);
+        toast({
+          title: 'Database table not ready. Please run the SQL setup script.',
+          status: 'error',
+          duration: 5000,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // If table exists, query for friends
       const { data, error } = await supabase
         .from('friends')
         .select(`
@@ -51,12 +74,17 @@ function CreatorDashboard() {
         `)
         .eq('creator_id', session.user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Friends query error:", error);
+        throw error;
+      }
+      
+      console.log("Friends data:", data);
       setFriends(data || []);
     } catch (error) {
       console.error('Error fetching friends:', error);
       toast({
-        title: 'Error loading friends',
+        title: 'Error loading friends data',
         status: 'error',
         duration: 3000,
       });
