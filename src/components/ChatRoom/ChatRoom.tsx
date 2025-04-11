@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAbly } from '../../contexts/AblyContext';
-import { Message } from '@ably/chat';
 import {
   Box,
   VStack,
@@ -10,23 +9,19 @@ import {
   Flex,
   Avatar,
   IconButton,
+  useToast,
 } from '@chakra-ui/react';
 import { ArrowBackIcon } from '@chakra-ui/icons';
 
-// Define extended interfaces to handle potential SDK version differences
-interface ExtendedRoom {
+// Define message interface since we can't rely on the SDK's Message type
+interface ChatMessage {
   id: string;
-  name?: string;
-  subscribe: any; // Using any since signatures differ between versions
-  publish?: (message: string) => Promise<void>;
-  sendMessage?: (message: { content: string }) => Promise<void>;
-  getMessages?: () => Promise<Message[]>;
-  [key: string]: any; // Other potential properties
-}
-
-interface ExtendedSubscription {
-  unsubscribe?: () => void;
-  [key: string]: any;
+  content: string;
+  timestamp: number;
+  sender: {
+    id: string;
+    name?: string;
+  };
 }
 
 interface ChatRoomProps {
@@ -40,105 +35,117 @@ interface ChatRoomProps {
 
 export function ChatRoom({ roomId, participant, onBack }: ChatRoomProps) {
   const { chatClient } = useAbly();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [room, setRoom] = useState<ExtendedRoom | null>(null);
+  const [ablyChannel, setAblyChannel] = useState<any>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!chatClient) return;
-    let cleanup: (() => void) | undefined;
-
-    const setupRoom = async () => {
+    let channelInstance: any = null;
+    
+    const setupChat = async () => {
       try {
-        console.log('Setting up chat room with ID:', roomId);
+        console.log('Setting up chat with ID:', roomId);
         
-        // Get the room - for Ably Chat SDK v0.5.1
-        const chatRoom = await chatClient.getRoom(roomId) as ExtendedRoom;
-        console.log('Room obtained:', chatRoom);
-        setRoom(chatRoom);
-
-        // Check if the subscribe method exists
-        if (typeof chatRoom.subscribe === 'function') {
-          try {
-            // Try the simpler subscribe method first
-            const subscription = chatRoom.subscribe((message: Message) => {
-              console.log('New message received:', message);
-              setMessages(prev => [...prev, message]);
-            }) as ExtendedSubscription;
-
-            // Set cleanup function
-            cleanup = () => {
-              if (subscription && typeof subscription.unsubscribe === 'function') {
-                subscription.unsubscribe();
-              }
-            };
-          } catch (subError) {
-            console.error('Error subscribing to messages:', subError);
-            
-            // Alternative subscribe method (for Ably v0.5.1)
-            try {
-              // @ts-ignore - Ignoring type error for different SDK versions
-              const subscription = chatRoom.subscribe('message', (message: Message) => {
-                console.log('New message received (v2):', message);
-                setMessages(prev => [...prev, message]);
-              }) as ExtendedSubscription;
-              
-              cleanup = () => {
-                if (subscription && typeof subscription.unsubscribe === 'function') {
-                  subscription.unsubscribe();
-                }
-              };
-            } catch (altSubError) {
-              console.error('Alternative subscription also failed:', altSubError);
-            }
-          }
-        } else {
-          console.error('Room object does not have a subscribe method');
+        // Access the Ably Realtime instance directly through chatClient
+        const ablyRealtime = (chatClient as any)._realtimeClient;
+        
+        if (!ablyRealtime) {
+          console.error('No Ably Realtime client available');
+          return;
         }
-
-        // Try to get message history if the method exists
+        
+        // Create a channel with the roomId
+        channelInstance = ablyRealtime.channels.get(roomId);
+        setAblyChannel(channelInstance);
+        
+        console.log('Channel created:', channelInstance);
+        
+        // Subscribe to messages on this channel
+        channelInstance.subscribe('message', (message: any) => {
+          console.log('Message received:', message);
+          
+          // Format the message to match our interface
+          const chatMessage: ChatMessage = {
+            id: message.id || Date.now().toString(),
+            content: message.data.text || message.data,
+            timestamp: message.timestamp || Date.now(),
+            sender: {
+              id: message.data.senderId || message.clientId || 'unknown',
+              name: message.data.senderName,
+            }
+          };
+          
+          setMessages(prev => [...prev, chatMessage]);
+        });
+        
+        // Try to get message history (if available in this Ably SDK version)
         try {
-          if (chatRoom.getMessages && typeof chatRoom.getMessages === 'function') {
-            const history = await chatRoom.getMessages();
-            console.log('Message history loaded:', history);
-            setMessages(history);
-          } else {
-            console.log('getMessages method not available on this room object');
+          const history = await channelInstance.history({ limit: 100 });
+          console.log('Message history:', history);
+          
+          if (history.items && history.items.length > 0) {
+            // Transform history items to match our message format
+            const historyMessages = history.items
+              .map((item: any) => ({
+                id: item.id || Date.now().toString(),
+                content: item.data.text || item.data,
+                timestamp: item.timestamp || Date.now(),
+                sender: {
+                  id: item.data.senderId || item.clientId || 'unknown',
+                  name: item.data.senderName,
+                }
+              }))
+              .reverse(); // Most recent last
+              
+            setMessages(historyMessages);
           }
         } catch (historyError) {
           console.error('Error loading message history:', historyError);
         }
+        
       } catch (error) {
-        console.error('Error setting up chat room:', error);
+        console.error('Error setting up chat channel:', error);
+        toast({
+          title: 'Chat Error',
+          description: 'Could not connect to the chat room',
+          status: 'error',
+          duration: 5000,
+        });
       }
     };
 
-    setupRoom();
+    setupChat();
 
     return () => {
-      if (cleanup) {
-        cleanup();
+      // Cleanup - unsubscribe from the channel
+      if (channelInstance) {
+        channelInstance.unsubscribe();
       }
     };
   }, [chatClient, roomId]);
 
   const handleSendMessage = async () => {
-    if (!room || !newMessage.trim()) return;
+    if (!ablyChannel || !newMessage.trim()) return;
 
     try {
-      // Try different message sending methods based on the SDK version
-      if (typeof room.sendMessage === 'function') {
-        await room.sendMessage({
-          content: newMessage,
-        });
-      } else if (typeof room.publish === 'function') {
-        await room.publish(newMessage);
-      } else {
-        throw new Error('No valid method to send messages found');
-      }
+      // Send message through the Ably channel
+      await ablyChannel.publish('message', {
+        text: newMessage,
+        senderId: (chatClient as any)?._realtimeClient?.auth?.clientId || 'unknown',
+        timestamp: Date.now()
+      });
+      
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send message',
+        status: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -168,6 +175,12 @@ export function ChatRoom({ roomId, participant, onBack }: ChatRoomProps) {
       <Box p={4} h="calc(100vh - 144px)" overflowY="auto">
         <VStack spacing={4} align="stretch">
           {/* Messages */}
+          {messages.length === 0 && (
+            <Text textAlign="center" color="gray.500" mt={10}>
+              No messages yet. Send a message to start the conversation.
+            </Text>
+          )}
+          
           {messages.map((message) => (
             <Flex
               key={message.id}
@@ -186,7 +199,7 @@ export function ChatRoom({ roomId, participant, onBack }: ChatRoomProps) {
                 maxW="80%"
               >
                 <Text fontSize="sm" fontWeight="bold">
-                  {message.sender?.id}
+                  {message.sender?.name || message.sender?.id}
                 </Text>
                 <Text>{message.content}</Text>
               </Box>

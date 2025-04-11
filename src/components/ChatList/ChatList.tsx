@@ -16,6 +16,7 @@ import {
 import { SearchIcon } from '@chakra-ui/icons';
 import { supabase } from '../../config/supabase';
 import { formatMessageTime } from '../../utils/dateFormat';
+import { generateChatRoomId } from '../../utils/chatUtils';
 
 interface ChatPreview {
   id: string;
@@ -32,6 +33,19 @@ interface ChatListProps {
   selectedChatId?: string;
 }
 
+// Interface for creator profile
+interface CreatorProfile {
+  username: string;
+  avatar_url: string | null;
+}
+
+// Interface for saved creator entry
+interface SavedCreator {
+  id: string;
+  creator_id: string;
+  creator: CreatorProfile;
+}
+
 function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,40 +60,40 @@ function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // This is a placeholder query - you'll need to adjust based on your actual database structure
-      const { data: chatsData, error } = await supabase
-        .from('chats')
+      // For now, we'll just show saved creators as potential chats
+      // In a real app, you would query your database for actual chat history
+      const { data, error } = await supabase
+        .from('saved_creators')
         .select(`
           id,
-          participants (
-            user_id,
-            profile:profiles (
-              username,
-              avatar_url
-            )
-          ),
-          messages (
-            content,
-            created_at,
-            read
+          creator_id,
+          creator:profiles!saved_creators_creator_id_fkey (
+            username,
+            avatar_url
           )
         `)
-        .eq('participants.user_id', session.user.id)
-        .order('messages.created_at', { ascending: false });
+        .eq('member_id', session.user.id);
 
       if (error) throw error;
+      
+      // Make TypeScript happy by asserting the type
+      const savedCreators = data as unknown as SavedCreator[];
 
       // Transform the data into ChatPreview format
-      // This is placeholder transformation - adjust based on your data structure
-      const transformedChats = chatsData.map(chat => ({
-        id: chat.id,
-        participantId: chat.participants[0].user_id,
-        participantName: chat.participants[0].profile.username,
-        participantAvatar: chat.participants[0].profile.avatar_url,
-        lastMessage: chat.messages[0]?.content || '',
-        lastMessageTime: chat.messages[0]?.created_at || '',
-        unreadCount: chat.messages.filter(m => !m.read).length,
-      }));
+      const transformedChats = savedCreators.map(item => {
+        // Generate room ID using the utility function
+        const roomId = generateChatRoomId(session.user.id, item.creator_id);
+        
+        return {
+          id: roomId,
+          participantId: item.creator_id,
+          participantName: item.creator.username || 'Unknown',
+          participantAvatar: item.creator.avatar_url || '',
+          lastMessage: 'Start chatting...',
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 0,
+        };
+      });
 
       setChats(transformedChats);
     } catch (error) {

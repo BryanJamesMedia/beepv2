@@ -249,21 +249,13 @@ const CreatorProfile: React.FC = () => {
       // Create a unique room ID using our utility function
       const roomId = generateChatRoomId(currentUser, profile.id);
       console.log('Starting chat with roomId:', roomId, 'between', currentUser, 'and', profile.id);
-      console.log('Chat client status:', chatClient, 'Connected:', isConnected);
       
       try {
-        // Check if getRoom method exists
-        if (typeof chatClient.getRoom !== 'function') {
-          throw new Error('ChatClient does not have getRoom method');
-        }
+        // Since getRoom method is not available in this version of Ably Chat SDK,
+        // we'll navigate directly to the chat page with the room information
+        console.log('Chat client available methods:', Object.keys(chatClient));
         
-        console.log('Attempting to get room:', roomId);
-        
-        // Try to get the room
-        const room = await chatClient.getRoom(roomId);
-        console.log('Chat room initialized successfully:', room);
-        
-        // Navigate to the chat page with the selected chat
+        // Navigate to the chat page with the chat info
         navigate('/chat', {
           state: {
             selectedChat: {
@@ -273,9 +265,18 @@ const CreatorProfile: React.FC = () => {
             }
           }
         });
+        
+        // Success message
+        toast({
+          title: 'Chat initialized',
+          description: 'Starting conversation with ' + profile.username,
+          status: 'success',
+          duration: 2000,
+        });
+        
       } catch (err) {
-        console.error('Error getting chat room:', err);
-        let errorMessage = 'Failed to initialize chat room';
+        console.error('Error initializing chat:', err);
+        let errorMessage = 'Failed to initialize chat';
         
         if (err instanceof Error) {
           errorMessage += `: ${err.message}`;
