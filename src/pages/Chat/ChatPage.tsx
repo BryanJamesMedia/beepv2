@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -15,8 +16,16 @@ interface Chat {
 }
 
 function ChatPage() {
+  const location = useLocation();
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const isMobile = useBreakpointValue({ base: true, md: false });
+
+  // Initialize with chat from navigation state if available
+  useEffect(() => {
+    if (location.state?.selectedChat) {
+      setSelectedChat(location.state.selectedChat);
+    }
+  }, [location.state]);
 
   // Show either chat list or chat room on mobile, both on desktop
   const showChatList = !isMobile || !selectedChat;

@@ -21,8 +21,9 @@ import {
   IconButton,
   useBreakpointValue,
 } from '@chakra-ui/react';
-import { FiArrowLeft, FiMapPin, FiBookmark, FiImage, FiInfo } from 'react-icons/fi';
+import { FiArrowLeft, FiMapPin, FiBookmark, FiImage, FiInfo, FiMessageCircle } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
+import { useAbly } from '../../contexts/AblyContext';
 
 // Fix the interface to match React Router v6 useParams
 interface CreatorProfileParams {
@@ -49,12 +50,14 @@ const CreatorProfile: React.FC = () => {
   const { id } = useParams<CreatorProfileParams>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { chatClient, isConnected } = useAbly();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [savingCreator, setSavingCreator] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
   const [viewingGallery, setViewingGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
@@ -205,6 +208,51 @@ const CreatorProfile: React.FC = () => {
       });
     } finally {
       setSavingCreator(false);
+    }
+  };
+
+  const handleStartChat = async () => {
+    try {
+      if (!profile || !currentUser || !chatClient || !isConnected) {
+        toast({
+          title: 'Chat connection not available',
+          description: 'Please try again later',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      setStartingChat(true);
+
+      // Create a unique room ID combining the current user ID and creator ID
+      // We sort the IDs to ensure the same room ID is generated regardless of who initiates
+      const participants = [currentUser, profile.id].sort();
+      const roomId = `chat_${participants[0]}_${participants[1]}`;
+
+      // Get or create the room
+      const room = await chatClient.getRoom(roomId);
+
+      // Navigate to the chat page with the selected chat
+      navigate('/chat', {
+        state: {
+          selectedChat: {
+            id: roomId,
+            participantId: profile.id,
+            participantName: profile.username
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast({
+        title: 'Failed to start chat',
+        description: 'Could not initialize chat session',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setStartingChat(false);
     }
   };
 
@@ -374,16 +422,28 @@ const CreatorProfile: React.FC = () => {
             </HStack>
 
             {currentUser && currentUser !== profile.id && (
-              <Button
-                leftIcon={<FiBookmark />}
-                colorScheme={isSaved ? "red" : "blue"}
-                variant={isSaved ? "outline" : "solid"}
-                onClick={handleSaveCreator}
-                isLoading={savingCreator}
-                alignSelf={isMobile ? "stretch" : "flex-start"}
-              >
-                {isSaved ? "Remove from Saved" : "Save Creator"}
-              </Button>
+              <VStack spacing={2} alignSelf={isMobile ? "stretch" : "flex-start"}>
+                <Button
+                  leftIcon={<FiBookmark />}
+                  colorScheme={isSaved ? "red" : "blue"}
+                  variant={isSaved ? "outline" : "solid"}
+                  onClick={handleSaveCreator}
+                  isLoading={savingCreator}
+                  w="full"
+                >
+                  {isSaved ? "Remove from Saved" : "Save Creator"}
+                </Button>
+                
+                <Button
+                  leftIcon={<FiMessageCircle />}
+                  colorScheme="green"
+                  onClick={handleStartChat}
+                  isLoading={startingChat}
+                  w="full"
+                >
+                  Start Chat
+                </Button>
+              </VStack>
             )}
           </Flex>
         </Box>
