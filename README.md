@@ -120,3 +120,23 @@ vercel --prod
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## Saved Creators Feature
+
+The application now uses a "Saved Creators" system instead of a friends-based system. This change allows members to:
+
+1. Search for creators they're interested in
+2. Save creators to their profile
+3. View their saved creators in the dashboard
+4. Remove saved creators when needed
+
+Creators can see which members have saved their profile, making it easier to identify their audience.
+
+### Database Changes
+
+The `friends` table has been replaced with a `saved_creators` table that includes:
+- member_id: The member who saved the creator
+- creator_id: The creator who was saved
+- created_at: When the creator was saved
+
+To apply these changes, run the SQL script in the `database_update.sql` file.

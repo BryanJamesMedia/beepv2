@@ -17,7 +17,7 @@ import {
   CardBody,
   Center,
 } from '@chakra-ui/react';
-import { FiUser, FiSettings, FiLock, FiUsers, FiBell, FiHelpCircle, FiChevronLeft, FiLogOut } from 'react-icons/fi';
+import { FiUser, FiSettings, FiLock, FiBell, FiHelpCircle, FiChevronLeft, FiLogOut, FiBookmark } from 'react-icons/fi';
 import { BiWallet, BiQr } from 'react-icons/bi';
 import { MdPayment } from 'react-icons/md';
 import { ProfileSettings } from './sections/ProfileSettings';
@@ -31,7 +31,7 @@ const menuItems = [
   { id: 'billing', label: 'Billing', icon: MdPayment, component: 'Billing Settings' },
   { id: 'wallet', label: 'Wallet', icon: BiWallet, component: 'Wallet Settings' },
   { id: 'qr-code', label: 'QR Code', icon: BiQr, component: 'QR Code Settings' },
-  { id: 'friends', label: 'Friends', icon: FiUsers, component: 'Friends Settings' },
+  { id: 'saved-creators', label: 'Saved Creators', icon: FiBookmark, component: 'Saved Creators' },
   { id: 'notifications', label: 'Notifications', icon: FiBell, component: 'Notification Settings' },
   { id: 'help', label: 'Help Center', icon: FiHelpCircle, component: 'Help Center' },
 ];
@@ -127,6 +127,13 @@ function MemberSettings() {
     switch(activeSection) {
       case 'profile':
         return <ProfileSettings />;
+      case 'saved-creators':
+        // Show saved creators content
+        return (
+          <Text>
+            Manage your saved creators here. You'll be able to view, organize, and remove creators you've saved.
+          </Text>
+        );
       // Add other cases for different sections
       default:
         return (

@@ -22,21 +22,33 @@ import {
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
 import TopMenu from '../../components/TopMenu';
-import AddFriends from '../../components/Dashboard/AddFriends';
 import { supabase } from '../../config/supabase';
 import { FiMessageSquare } from 'react-icons/fi';
 import useCustomToast from '../../hooks/useCustomToast';
 
+// Define the types for follower data
+interface FollowerMember {
+  id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+}
+
+interface Follower {
+  member_id: string;
+  member: FollowerMember;
+}
+
 function CreatorDashboard() {
-  const [friends, setFriends] = useState([]);
+  const [followers, setFollowers] = useState<Follower[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const toast = useCustomToast();
 
   useEffect(() => {
-    fetchFriends();
+    fetchFollowers();
   }, []);
 
-  const fetchFriends = async () => {
+  const fetchFollowers = async () => {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,11 +58,9 @@ function CreatorDashboard() {
         return;
       }
 
-      console.log("User ID:", session.user.id);
-
-      // First check if the table exists by trying to get its schema
+      // First check if the table exists
       const { error: tableCheckError } = await supabase
-        .from('friends')
+        .from('saved_creators')
         .select('id')
         .limit(1);
 
@@ -65,9 +75,9 @@ function CreatorDashboard() {
         return;
       }
 
-      // If table exists, query for friends
+      // Get members who have saved this creator
       const { data, error } = await supabase
-        .from('friends')
+        .from('saved_creators')
         .select(`
           member_id,
           member:member_id(id, username, display_name, avatar_url)
@@ -75,16 +85,15 @@ function CreatorDashboard() {
         .eq('creator_id', session.user.id);
 
       if (error) {
-        console.error("Friends query error:", error);
+        console.error("Followers query error:", error);
         throw error;
       }
       
-      console.log("Friends data:", data);
-      setFriends(data || []);
+      setFollowers(data || []);
     } catch (error) {
-      console.error('Error fetching friends:', error);
+      console.error('Error fetching followers:', error);
       toast({
-        title: 'Error loading friends data',
+        title: 'Error loading follower data',
         status: 'error',
         duration: 3000,
       });
@@ -93,10 +102,10 @@ function CreatorDashboard() {
     }
   };
 
-  const startChat = (friendId) => {
-    // Logic to start a chat with a friend
-    console.log('Starting chat with:', friendId);
-    // Navigate to chat page with this friend
+  const startChat = (memberId: string) => {
+    // Logic to start a chat with a follower
+    console.log('Starting chat with:', memberId);
+    // Navigate to chat page with this member
   };
 
   return (
@@ -104,9 +113,6 @@ function CreatorDashboard() {
       <VStack spacing={8} align="stretch">
         <TopMenu />
         <Heading size="lg">Creator Dashboard</Heading>
-        
-        {/* Add Friends Section */}
-        <AddFriends userRole="creator" />
 
         {/* Earnings Stats */}
         <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
@@ -133,17 +139,17 @@ function CreatorDashboard() {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Lifetime Earnings</StatLabel>
-                <StatNumber>$0.00</StatNumber>
-                <StatHelpText>All time earnings</StatHelpText>
+                <StatLabel>Total Followers</StatLabel>
+                <StatNumber>{followers.length}</StatNumber>
+                <StatHelpText>Members who saved your profile</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
         </Grid>
 
-        {/* Friends List */}
+        {/* Followers List */}
         <Box>
-          <Heading size="md" mb={4}>Members</Heading>
+          <Heading size="md" mb={4}>Your Followers</Heading>
           <Card>
             <CardBody>
               {isLoading ? (
@@ -161,41 +167,41 @@ function CreatorDashboard() {
                     {i < 2 && <Divider my={4} />}
                   </Box>
                 ))
-              ) : friends.length > 0 ? (
-                // Friends list
-                friends.map((friend, index) => (
-                  <Box key={friend.member_id}>
+              ) : followers.length > 0 ? (
+                // Followers list
+                followers.map((follower, index) => (
+                  <Box key={follower.member_id}>
                     <HStack justify="space-between" align="center">
                       <HStack>
                         <Avatar 
                           size="md" 
-                          name={friend.member.display_name || friend.member.username} 
-                          src={friend.member.avatar_url}
+                          name={follower.member.display_name || follower.member.username} 
+                          src={follower.member.avatar_url}
                         />
                         <Box>
                           <Text fontWeight="bold">
-                            {friend.member.display_name || friend.member.username}
+                            {follower.member.display_name || follower.member.username}
                           </Text>
-                          <Text fontSize="sm" color="gray.500">Member</Text>
+                          <Text fontSize="sm" color="gray.500">Follower</Text>
                         </Box>
                       </HStack>
                       <Button 
                         leftIcon={<FiMessageSquare />} 
                         colorScheme="blue" 
                         size="sm"
-                        onClick={() => startChat(friend.member_id)}
+                        onClick={() => startChat(follower.member_id)}
                       >
                         Chat
                       </Button>
                     </HStack>
-                    {index < friends.length - 1 && <Divider my={4} />}
+                    {index < followers.length - 1 && <Divider my={4} />}
                   </Box>
                 ))
               ) : (
                 // Empty state
                 <Center py={8}>
                   <Text color="gray.500">
-                    No members added yet. Use the options above to find members.
+                    No followers yet. Share your profile with potential followers.
                   </Text>
                 </Center>
               )}
