@@ -15,6 +15,7 @@ import { AblyProvider } from './contexts/AblyContext';
 import ChatPage from './pages/Chat/ChatPage';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Settings from './pages/Settings/Settings';
+import CreatorProfile from './pages/Profile/CreatorProfile';
 
 function App() {
   return (
@@ -49,6 +50,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:id" 
+              element={
+                <ProtectedRoute>
+                  <CreatorProfile />
                 </ProtectedRoute>
               } 
             />

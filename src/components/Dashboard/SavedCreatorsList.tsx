@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   VStack,
@@ -12,8 +13,10 @@ import {
   Icon,
   useColorModeValue,
   useToast,
+  Flex,
+  Link,
 } from '@chakra-ui/react';
-import { FiTrash2 } from 'react-icons/fi';
+import { FiTrash2, FiEye } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
 
 const SavedCreatorsList: React.FC = () => {
@@ -22,6 +25,8 @@ const SavedCreatorsList: React.FC = () => {
   const [isRemoving, setIsRemoving] = useState(false);
   const toast = useToast();
   const emptyTextColor = useColorModeValue('gray.500', 'gray.400');
+  const cardBg = useColorModeValue('white', 'gray.700');
+  const cardHoverBg = useColorModeValue('gray.50', 'gray.600');
 
   useEffect(() => {
     fetchSavedCreators();
@@ -50,7 +55,7 @@ const SavedCreatorsList: React.FC = () => {
         
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url, display_name')
+          .select('id, username, avatar_url, display_name, headline, location')
           .in('id', creatorIds);
 
         if (profilesError) throw profilesError;
@@ -117,39 +122,68 @@ const SavedCreatorsList: React.FC = () => {
       ) : savedCreators.length > 0 ? (
         <VStack spacing={2} align="stretch">
           {savedCreators.map((creator, index) => (
-            <React.Fragment key={creator.id}>
-              <HStack 
-                p={4} 
-                borderWidth="1px" 
-                borderRadius="lg" 
-                justify="space-between"
-                bg={useColorModeValue('white', 'gray.700')}
-                _hover={{ boxShadow: 'md' }}
-              >
-                <HStack spacing={4}>
+            <Box 
+              key={creator.id}
+              p={4} 
+              borderWidth="1px" 
+              borderRadius="lg"
+              bg={cardBg}
+              _hover={{ boxShadow: 'md', bg: cardHoverBg }}
+              transition="all 0.2s"
+            >
+              <Flex justify="space-between" wrap={{ base: "wrap", md: "nowrap" }}>
+                <HStack spacing={4} mb={{ base: 3, md: 0 }} flex="1">
                   <Avatar 
                     size="md" 
-                    name={creator.display_name || creator.username} 
+                    name={creator.username} 
                     src={creator.avatar_url}
                   />
-                  <Box>
-                    <Text fontWeight="bold">{creator.display_name || creator.username}</Text>
-                    <Text fontSize="sm" color={emptyTextColor}>@{creator.username}</Text>
-                  </Box>
+                  <VStack align="start" spacing={0}>
+                    <Link 
+                      as={RouterLink} 
+                      to={`/creator/${creator.id}`}
+                      fontWeight="bold"
+                      _hover={{ color: 'blue.500', textDecoration: 'none' }}
+                    >
+                      @{creator.username}
+                    </Link>
+                    {creator.headline && (
+                      <Text fontSize="sm" color="gray.600" noOfLines={1}>
+                        {creator.headline}
+                      </Text>
+                    )}
+                    {creator.location && (
+                      <Text fontSize="xs" color={emptyTextColor}>
+                        {creator.location}
+                      </Text>
+                    )}
+                  </VStack>
                 </HStack>
-                <Button
-                  size="sm"
-                  colorScheme="red"
-                  variant="ghost"
-                  leftIcon={<Icon as={FiTrash2} />}
-                  onClick={() => removeCreator(creator.id)}
-                  isLoading={isRemoving}
-                >
-                  Remove
-                </Button>
-              </HStack>
-              {index < savedCreators.length - 1 && <Divider my={2} />}
-            </React.Fragment>
+                
+                <HStack>
+                  <Button
+                    as={RouterLink}
+                    to={`/creator/${creator.id}`}
+                    size="sm"
+                    leftIcon={<Icon as={FiEye} />}
+                    colorScheme="blue"
+                    variant="outline"
+                  >
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    colorScheme="red"
+                    variant="ghost"
+                    leftIcon={<Icon as={FiTrash2} />}
+                    onClick={() => removeCreator(creator.id)}
+                    isLoading={isRemoving}
+                  >
+                    Remove
+                  </Button>
+                </HStack>
+              </Flex>
+            </Box>
           ))}
         </VStack>
       ) : (
@@ -158,7 +192,7 @@ const SavedCreatorsList: React.FC = () => {
           textAlign="center" 
           borderWidth="1px" 
           borderRadius="lg"
-          bg={useColorModeValue('white', 'gray.700')}
+          bg={cardBg}
         >
           <Text color={emptyTextColor}>
             No creators saved yet. Search and save creators you're interested in.

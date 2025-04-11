@@ -140,3 +140,38 @@ The `friends` table has been replaced with a `saved_creators` table that include
 - created_at: When the creator was saved
 
 To apply these changes, run the SQL script in the `database_update.sql` file.
+
+## Enhanced Creator Profiles
+
+Creators now have enhanced profile functionality with the following features:
+
+### Profile Settings
+
+Creator profiles have been enhanced with:
+- A headline to quickly describe themselves
+- Location information
+- Age information
+- Gender selection
+- Extended bio
+- Photo gallery with support for up to 10 photos
+
+The `display_name` field has been removed in favor of using the username directly.
+
+### Profile Viewing
+
+Members can view detailed creator profiles by:
+1. Clicking on a creator in their "Saved Creators" list
+2. The profile page shows:
+   - Creator's avatar and username
+   - Headline and location 
+   - Age and gender information
+   - Full bio
+   - Photo gallery with browsing capability
+
+### Database Changes
+
+The profiles table has been updated with new fields and a new gallery table has been added:
+- New profile fields: location, age, gender, headline
+- New gallery table for storing multiple photos per creator
+
+To apply these database changes, run the SQL script in the `database_update_profile.sql` file.
