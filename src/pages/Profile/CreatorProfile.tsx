@@ -224,10 +224,20 @@ const CreatorProfile: React.FC = () => {
         return;
       }
       
-      if (!chatClient || !isConnected) {
+      if (!chatClient) {
         toast({
-          title: 'Chat connection not available',
-          description: 'Please try again later',
+          title: 'Chat service unavailable',
+          description: 'Chat client is not initialized',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+      
+      if (!isConnected) {
+        toast({
+          title: 'Chat disconnected',
+          description: 'Please wait for the chat service to connect',
           status: 'error',
           duration: 3000,
         });
@@ -238,11 +248,20 @@ const CreatorProfile: React.FC = () => {
 
       // Create a unique room ID using our utility function
       const roomId = generateChatRoomId(currentUser, profile.id);
+      console.log('Starting chat with roomId:', roomId, 'between', currentUser, 'and', profile.id);
+      console.log('Chat client status:', chatClient, 'Connected:', isConnected);
       
       try {
-        // Get or create the room
+        // Check if getRoom method exists
+        if (typeof chatClient.getRoom !== 'function') {
+          throw new Error('ChatClient does not have getRoom method');
+        }
+        
+        console.log('Attempting to get room:', roomId);
+        
+        // Try to get the room
         const room = await chatClient.getRoom(roomId);
-        console.log('Chat room initialized:', room);
+        console.log('Chat room initialized successfully:', room);
         
         // Navigate to the chat page with the selected chat
         navigate('/chat', {
@@ -256,7 +275,13 @@ const CreatorProfile: React.FC = () => {
         });
       } catch (err) {
         console.error('Error getting chat room:', err);
-        throw new Error('Failed to initialize chat room');
+        let errorMessage = 'Failed to initialize chat room';
+        
+        if (err instanceof Error) {
+          errorMessage += `: ${err.message}`;
+        }
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -264,7 +289,8 @@ const CreatorProfile: React.FC = () => {
         title: 'Failed to start chat',
         description: error instanceof Error ? error.message : 'Could not initialize chat session',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
+        isClosable: true,
       });
     } finally {
       setStartingChat(false);
