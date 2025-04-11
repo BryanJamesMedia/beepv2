@@ -12,6 +12,7 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { ArrowBackIcon } from '@chakra-ui/icons';
+import { supabase } from '../../config/supabase';
 
 // Define message interface since we can't rely on the SDK's Message type
 interface ChatMessage {
@@ -130,12 +131,32 @@ export function ChatRoom({ roomId, participant, onBack }: ChatRoomProps) {
     if (!ablyChannel || !newMessage.trim()) return;
 
     try {
+      const timestamp = Date.now();
+      const currentUserId = (chatClient as any)?._realtimeClient?.auth?.clientId || 'unknown';
+      
       // Send message through the Ably channel
       await ablyChannel.publish('message', {
         text: newMessage,
-        senderId: (chatClient as any)?._realtimeClient?.auth?.clientId || 'unknown',
-        timestamp: Date.now()
+        senderId: currentUserId,
+        timestamp: timestamp
       });
+      
+      // Update the chat record in the database with the last message
+      try {
+        const { error: updateError } = await supabase
+          .from('chats')
+          .update({
+            last_message: newMessage,
+            last_message_time: new Date(timestamp).toISOString()
+          })
+          .eq('id', roomId);
+          
+        if (updateError) {
+          console.error('Error updating chat record:', updateError);
+        }
+      } catch (dbError) {
+        console.error('Database error when updating last message:', dbError);
+      }
       
       setNewMessage('');
     } catch (error) {

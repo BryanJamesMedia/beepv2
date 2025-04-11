@@ -251,6 +251,69 @@ const CreatorProfile: React.FC = () => {
       console.log('Starting chat with roomId:', roomId, 'between', currentUser, 'and', profile.id);
       
       try {
+        // First, check if this chat relationship already exists in the database
+        const { data: existingChat, error: checkError } = await supabase
+          .from('chats')
+          .select('id')
+          .or(`and(initiator_id.eq.${currentUser},participant_id.eq.${profile.id}),and(initiator_id.eq.${profile.id},participant_id.eq.${currentUser})`)
+          .maybeSingle();
+          
+        if (checkError) {
+          console.error('Error checking existing chat:', checkError);
+        }
+        
+        // If chat doesn't exist, create it
+        if (!existingChat) {
+          // Get current user's profile info
+          const { data: currentUserProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', currentUser)
+            .single();
+            
+          if (profileError) {
+            console.error('Error getting current user profile:', profileError);
+            throw new Error('Could not get user information');
+          }
+          
+          // Store the chat relationship in Supabase
+          const { error: insertError } = await supabase
+            .from('chats')
+            .insert({
+              id: roomId,
+              initiator_id: currentUser,
+              participant_id: profile.id,
+              initiator_name: currentUserProfile.username,
+              participant_name: profile.username,
+              created_at: new Date().toISOString()
+            });
+            
+          if (insertError) {
+            console.error('Error creating chat record:', insertError);
+            // Continue anyway, but log the error
+          } else {
+            console.log('Chat record created successfully');
+          }
+        } else {
+          console.log('Chat already exists:', existingChat);
+        }
+        
+        // Send a notification message in the channel
+        const ablyRealtime = (chatClient as any)._realtimeClient;
+        if (ablyRealtime) {
+          try {
+            const channel = ablyRealtime.channels.get(roomId);
+            await channel.publish('system', {
+              type: 'invitation',
+              text: `Chat started by ${currentUser}`,
+              timestamp: Date.now()
+            });
+            console.log('Invitation message sent');
+          } catch (channelError) {
+            console.error('Error sending invitation message:', channelError);
+          }
+        }
+        
         // Since getRoom method is not available in this version of Ably Chat SDK,
         // we'll navigate directly to the chat page with the room information
         console.log('Chat client available methods:', Object.keys(chatClient));

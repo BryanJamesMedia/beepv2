@@ -60,9 +60,38 @@ function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // For now, we'll just show saved creators as potential chats
-      // In a real app, you would query your database for actual chat history
-      const { data, error } = await supabase
+      const userId = session.user.id;
+      
+      // Fetch existing chats where the current user is either the initiator or participant
+      const { data: chatData, error: chatError } = await supabase
+        .from('chats')
+        .select('*')
+        .or(`initiator_id.eq.${userId},participant_id.eq.${userId}`);
+        
+      if (chatError) {
+        console.error('Error fetching chats:', chatError);
+      }
+      
+      // Convert chat data to our ChatPreview format
+      const existingChats = (chatData || []).map(chat => {
+        // Determine if current user is the initiator or participant
+        const isInitiator = chat.initiator_id === userId;
+        
+        return {
+          id: chat.id,
+          participantId: isInitiator ? chat.participant_id : chat.initiator_id,
+          participantName: isInitiator ? chat.participant_name : chat.initiator_name,
+          participantAvatar: '', // We don't have this info in the chats table
+          lastMessage: chat.last_message || 'Start chatting...',
+          lastMessageTime: chat.last_message_time || chat.created_at,
+          unreadCount: chat.unread_count || 0,
+        };
+      });
+      
+      // Now fetch saved creators that are not already in our chat list
+      const existingChatIds = new Set(existingChats.map(chat => chat.participantId));
+      
+      const { data: savedCreatorsData, error: savedError } = await supabase
         .from('saved_creators')
         .select(`
           id,
@@ -72,30 +101,36 @@ function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
             avatar_url
           )
         `)
-        .eq('member_id', session.user.id);
+        .eq('member_id', userId);
 
-      if (error) throw error;
+      if (savedError) {
+        console.error('Error fetching saved creators:', savedError);
+        throw savedError;
+      }
       
       // Make TypeScript happy by asserting the type
-      const savedCreators = data as unknown as SavedCreator[];
+      const savedCreators = savedCreatorsData as unknown as SavedCreator[];
 
-      // Transform the data into ChatPreview format
-      const transformedChats = savedCreators.map(item => {
-        // Generate room ID using the utility function
-        const roomId = generateChatRoomId(session.user.id, item.creator_id);
-        
-        return {
-          id: roomId,
-          participantId: item.creator_id,
-          participantName: item.creator.username || 'Unknown',
-          participantAvatar: item.creator.avatar_url || '',
-          lastMessage: 'Start chatting...',
-          lastMessageTime: new Date().toISOString(),
-          unreadCount: 0,
-        };
-      });
+      // Transform saved creators to ChatPreview format (only those not already in chat)
+      const savedCreatorChats = savedCreators
+        .filter(item => !existingChatIds.has(item.creator_id))
+        .map(item => {
+          // Generate room ID using the utility function
+          const roomId = generateChatRoomId(session.user.id, item.creator_id);
+          
+          return {
+            id: roomId,
+            participantId: item.creator_id,
+            participantName: item.creator.username || 'Unknown',
+            participantAvatar: item.creator.avatar_url || '',
+            lastMessage: 'Start chatting...',
+            lastMessageTime: new Date().toISOString(),
+            unreadCount: 0,
+          };
+        });
 
-      setChats(transformedChats);
+      // Combine both sources of chats, prioritizing active chats
+      setChats([...existingChats, ...savedCreatorChats]);
     } catch (error) {
       console.error('Error fetching chats:', error);
     } finally {
