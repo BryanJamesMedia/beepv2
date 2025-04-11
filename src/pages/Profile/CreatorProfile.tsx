@@ -24,6 +24,7 @@ import {
 import { FiArrowLeft, FiMapPin, FiBookmark, FiImage, FiInfo, FiMessageCircle } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
 import { useAbly } from '../../contexts/AblyContext';
+import { generateChatRoomId } from '../../utils/chatUtils';
 
 // Fix the interface to match React Router v6 useParams
 interface CreatorProfileParams {
@@ -213,7 +214,17 @@ const CreatorProfile: React.FC = () => {
 
   const handleStartChat = async () => {
     try {
-      if (!profile || !currentUser || !chatClient || !isConnected) {
+      if (!profile || !currentUser) {
+        toast({
+          title: 'Cannot start chat',
+          description: 'User information is not available',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+      
+      if (!chatClient || !isConnected) {
         toast({
           title: 'Chat connection not available',
           description: 'Please try again later',
@@ -225,29 +236,33 @@ const CreatorProfile: React.FC = () => {
 
       setStartingChat(true);
 
-      // Create a unique room ID combining the current user ID and creator ID
-      // We sort the IDs to ensure the same room ID is generated regardless of who initiates
-      const participants = [currentUser, profile.id].sort();
-      const roomId = `chat_${participants[0]}_${participants[1]}`;
-
-      // Get or create the room
-      const room = await chatClient.getRoom(roomId);
-
-      // Navigate to the chat page with the selected chat
-      navigate('/chat', {
-        state: {
-          selectedChat: {
-            id: roomId,
-            participantId: profile.id,
-            participantName: profile.username
+      // Create a unique room ID using our utility function
+      const roomId = generateChatRoomId(currentUser, profile.id);
+      
+      try {
+        // Get or create the room
+        const room = await chatClient.getRoom(roomId);
+        console.log('Chat room initialized:', room);
+        
+        // Navigate to the chat page with the selected chat
+        navigate('/chat', {
+          state: {
+            selectedChat: {
+              id: roomId,
+              participantId: profile.id,
+              participantName: profile.username
+            }
           }
-        }
-      });
+        });
+      } catch (err) {
+        console.error('Error getting chat room:', err);
+        throw new Error('Failed to initialize chat room');
+      }
     } catch (error) {
       console.error('Error starting chat:', error);
       toast({
         title: 'Failed to start chat',
-        description: 'Could not initialize chat session',
+        description: error instanceof Error ? error.message : 'Could not initialize chat session',
         status: 'error',
         duration: 3000,
       });
@@ -439,6 +454,7 @@ const CreatorProfile: React.FC = () => {
                   colorScheme="green"
                   onClick={handleStartChat}
                   isLoading={startingChat}
+                  isDisabled={!isConnected}
                   w="full"
                 >
                   Start Chat
