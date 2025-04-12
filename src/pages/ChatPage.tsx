@@ -110,16 +110,44 @@ export function ChatPage() {
     }
   };
 
-  const handleStartChat = (creator: SavedCreator) => {
-    navigate('/chat', {
-      state: {
-        selectedChat: {
-          participantId: creator.id,
-          participantName: creator.username
-        }
+  const handleStartChat = async (creator: SavedCreator) => {
+    try {
+      if (!weavyClient) {
+        toast({
+          title: 'Chat service unavailable',
+          description: 'Please try again later',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
       }
-    });
-    onClose();
+
+      // Create chat even if recipient is offline
+      const chatOptions = {
+        members: [creator.id],
+        title: `Chat with ${creator.username}`,
+      };
+
+      // Navigate to the chat
+      navigate('/chat', {
+        state: {
+          selectedChat: {
+            participantId: creator.id,
+            participantName: creator.username
+          }
+        }
+      });
+      onClose();
+
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start chat. Please try again.',
+        status: 'error',
+        duration: 3000,
+      });
+    }
   };
 
   useEffect(() => {

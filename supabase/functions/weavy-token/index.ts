@@ -12,6 +12,27 @@ const WEAVY_API_KEY = 'wys_273MseFIJj4TOCq2yHbMlb2YR5wDQN3etBGw';
 // In-memory token store (in production, use a database)
 const tokenStore = new Map<string, { token: string; expiresAt: number }>();
 
+// Function to ensure a user exists in Weavy
+async function ensureWeavyUser(userId: string, email: string | undefined, name: string) {
+  const weavyUserResponse = await fetch(`${WEAVY_URL}/api/users`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${WEAVY_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      uid: userId,
+      name: name || email?.split('@')[0] || userId,
+      email: email
+    })
+  });
+
+  if (!weavyUserResponse.ok) {
+    console.error('Failed to create Weavy user:', await weavyUserResponse.text());
+    // Don't throw - we want to continue even if user creation fails
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -38,6 +59,21 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
+    // If this is a user creation request
+    if (req.method === 'POST') {
+      const body = await req.json();
+      if (body.action === 'create_user') {
+        await ensureWeavyUser(body.userId, body.email, body.name);
+        return new Response(
+          JSON.stringify({ success: true }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+    }
+
     // Check if we need to refresh the token
     const url = new URL(req.url);
     const refresh = url.searchParams.get('refresh') === 'true';
@@ -59,25 +95,10 @@ serve(async (req) => {
       }
     }
 
-    // Step 1: Create/Update Weavy user
-    const weavyUserResponse = await fetch(`${WEAVY_URL}/api/users`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${WEAVY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        uid: user.id,
-        name: user.email?.split('@')[0] || user.id,
-        email: user.email
-      })
-    })
+    // Ensure user exists in Weavy
+    await ensureWeavyUser(user.id, user.email, user.email?.split('@')[0] || user.id);
 
-    if (!weavyUserResponse.ok) {
-      throw new Error(`Failed to create/update Weavy user: ${await weavyUserResponse.text()}`)
-    }
-
-    // Step 2: Generate Weavy token for the user
+    // Generate Weavy token for the user
     const tokenResponse = await fetch(
       `${WEAVY_URL}/api/users/${user.id}/tokens`,
       {

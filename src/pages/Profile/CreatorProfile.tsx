@@ -222,111 +222,17 @@ const CreatorProfile: React.FC = () => {
         });
         return;
       }
-      
-      if (!weavyClient) {
-        toast({
-          title: 'Chat service unavailable',
-          description: 'Chat client is not initialized',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
-      
-      if (!isConnected) {
-        toast({
-          title: 'Chat disconnected',
-          description: 'Please wait for the chat service to connect',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
 
-      setStartingChat(true);
+      // Navigate to chat page - the recipient doesn't need to be online
+      navigate('/chat', {
+        state: {
+          selectedChat: {
+            participantId: profile.id,
+            participantName: profile.username
+          }
+        }
+      });
 
-      try {
-        // First, check if this chat relationship already exists in the database
-        const { data: existingChat, error: checkError } = await supabase
-          .from('chats')
-          .select('id')
-          .or(`and(initiator_id.eq.${currentUser},participant_id.eq.${profile.id}),and(initiator_id.eq.${profile.id},participant_id.eq.${currentUser})`)
-          .maybeSingle();
-          
-        if (checkError) {
-          console.error('Error checking existing chat:', checkError);
-        }
-        
-        // If chat doesn't exist, create it
-        if (!existingChat) {
-          // Get current user's profile info
-          const { data: currentUserProfile, error: profileError } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', currentUser)
-            .single();
-            
-          if (profileError) {
-            console.error('Error getting current user profile:', profileError);
-            throw new Error('Could not get user information');
-          }
-          
-          // Store the chat relationship in Supabase
-          const { error: insertError } = await supabase
-            .from('chats')
-            .insert({
-              initiator_id: currentUser,
-              participant_id: profile.id,
-              initiator_name: currentUserProfile.username,
-              participant_name: profile.username,
-              created_at: new Date().toISOString()
-            });
-            
-          if (insertError) {
-            console.error('Error creating chat record:', insertError);
-            // Continue anyway, but log the error
-          } else {
-            console.log('Chat record created successfully');
-          }
-        } else {
-          console.log('Chat already exists:', existingChat);
-        }
-        
-        // Navigate to the chat page
-        navigate('/chat', {
-          state: {
-            selectedChat: {
-              participantId: profile.id,
-              participantName: profile.username
-            }
-          }
-        });
-        
-        // Success message
-        toast({
-          title: 'Chat initialized',
-          description: 'Starting conversation with ' + profile.username,
-          status: 'success',
-          duration: 2000,
-        });
-        
-      } catch (err) {
-        console.error('Error initializing chat:', err);
-        let errorMessage = 'Failed to initialize chat';
-        
-        if (err instanceof Error) {
-          errorMessage += `: ${err.message}`;
-        }
-        
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          status: 'error',
-          duration: 3000,
-        });
-      } finally {
-        setStartingChat(false);
-      }
     } catch (error) {
       console.error('Error in handleStartChat:', error);
       toast({
@@ -335,7 +241,6 @@ const CreatorProfile: React.FC = () => {
         status: 'error',
         duration: 3000,
       });
-      setStartingChat(false);
     }
   };
 
