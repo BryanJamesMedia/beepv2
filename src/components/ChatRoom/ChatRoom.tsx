@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, VStack, Text, Button, useToast } from '@chakra-ui/react';
 import { useWeavyChat } from '../../contexts/WeavyContext';
 import { WyChat } from '@weavy/uikit-react';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 interface ChatRoomProps {
   chatId: string;
@@ -14,6 +14,7 @@ export function ChatRoom({ chatId, otherUserId, otherUserName }: ChatRoomProps) 
   const { weavyClient, isConnected } = useWeavyChat();
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
+  const { supabase, user } = useSupabase();
 
   useEffect(() => {
     if (!isConnected) {

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { supabase } from '../config/supabase';
+import { useSupabase } from '../contexts/SupabaseContext';
 import debounce from 'lodash/debounce';
 import {
   Box,
@@ -25,6 +25,7 @@ import {
   ListIcon,
   InputRightAddon,
   Spinner,
+  useToast,
 } from '@chakra-ui/react';
 import { 
   ViewIcon, 
@@ -35,7 +36,6 @@ import {
 } from '@chakra-ui/icons';
 
 function Signup() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -57,6 +57,10 @@ function Signup() {
     uppercase: false,
     special: false
   });
+
+  const { supabase } = useSupabase();
+  const toast = useToast();
+  const navigate = useNavigate();
 
   const validatePassword = (password: string) => {
     setPasswordErrors({
@@ -109,7 +113,7 @@ function Signup() {
         setIsCheckingUsername(false);
       }
     }, 500),
-    []
+    [supabase]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,7 +167,13 @@ function Signup() {
 
         if (profileError) throw profileError;
 
-        alert('Please check your email to confirm your account.');
+        toast({
+          title: 'Success',
+          description: 'Please check your email for the confirmation link',
+          status: 'success',
+          duration: 5000,
+        });
+
         navigate('/login');
       }
     } catch (err: any) {

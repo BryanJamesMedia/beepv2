@@ -22,7 +22,7 @@ import {
   useBreakpointValue,
 } from '@chakra-ui/react';
 import { FiArrowLeft, FiMapPin, FiBookmark, FiImage, FiInfo, FiMessageCircle } from 'react-icons/fi';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { useWeavyChat } from '../../contexts/WeavyContext';
 
 // Fix the interface to match React Router v6 useParams
@@ -33,12 +33,10 @@ interface CreatorProfileParams {
 interface ProfileData {
   id: string;
   username: string;
-  bio: string;
-  avatar_url: string | null;
-  location: string | null;
-  age: string | null;
-  gender: string | null;
-  headline: string | null;
+  display_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  location?: string;
   role: string;
 }
 
@@ -46,15 +44,17 @@ interface GalleryImage {
   image_url: string;
 }
 
+interface CreatorProfileProps {
+  creatorId: string;
+}
+
 const CreatorProfile: React.FC = () => {
-  const { id } = useParams<CreatorProfileParams>();
-  const navigate = useNavigate();
-  const toast = useToast();
+  const { id } = useParams<{ id: string }>();
+  const { supabase, user } = useSupabase();
   const { weavyClient, isConnected, isLoading: weavyLoading } = useWeavyChat();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [creator, setCreator] = useState<ProfileData | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [savingCreator, setSavingCreator] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
@@ -62,148 +62,106 @@ const CreatorProfile: React.FC = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const toast = useToast();
 
   useEffect(() => {
+    if (!user || !id) return;
+
+    const fetchCreatorProfile = async () => {
+      try {
+        // Fetch creator profile
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        // Check if creator is saved
+        const { data: savedData, error: savedError } = await supabase
+          .from("saved_creators")
+          .select("*")
+          .eq("member_id", user.id)
+          .eq("creator_id", id)
+          .single();
+
+        if (savedError && savedError.code !== "PGRST116") {
+          throw savedError;
+        }
+
+        setCreator(profileData);
+        setIsSaved(!!savedData);
+
+        // Fetch gallery images
+        const { data: galleryData, error: galleryError } = await supabase
+          .from('gallery')
+          .select('image_url')
+          .eq('user_id', id)
+          .order('created_at', { ascending: false });
+
+        if (galleryError) throw galleryError;
+        if (galleryData) {
+          setGalleryImages(galleryData.map(item => item.image_url));
+        }
+      } catch (error: any) {
+        console.error("Error fetching creator profile:", error);
+        toast({
+          title: "Error",
+          description: error.message,
+          status: "error",
+          duration: 3000,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchCreatorProfile();
-    checkCurrentUser();
-  }, [id]);
-
-  useEffect(() => {
-    if (currentUser && profile) {
-      checkIfCreatorIsSaved();
-    }
-  }, [currentUser, profile]);
-
-  const fetchCreatorProfile = async () => {
-    try {
-      setLoading(true);
-      if (!id) return;
-
-      // Fetch profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, username, bio, avatar_url, location, age, gender, headline, role')
-        .eq('id', id)
-        .single();
-
-      if (profileError) throw profileError;
-      if (!profileData) {
-        toast({
-          title: 'Creator not found',
-          status: 'error',
-          duration: 3000,
-        });
-        navigate('/dashboard');
-        return;
-      }
-
-      if (profileData.role !== 'creator') {
-        toast({
-          title: 'This profile is not a creator',
-          status: 'error',
-          duration: 3000,
-        });
-        navigate('/dashboard');
-        return;
-      }
-
-      setProfile(profileData);
-
-      // Fetch gallery images
-      const { data: galleryData, error: galleryError } = await supabase
-        .from('gallery')
-        .select('image_url')
-        .eq('user_id', id)
-        .order('created_at', { ascending: false });
-
-      if (galleryError) throw galleryError;
-      if (galleryData) {
-        setGalleryImages(galleryData.map(item => item.image_url));
-      }
-    } catch (error) {
-      console.error('Error fetching creator profile:', error);
-      toast({
-        title: 'Error loading profile',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const checkCurrentUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setCurrentUser(session.user.id);
-    }
-  };
-
-  const checkIfCreatorIsSaved = async () => {
-    try {
-      if (!currentUser || !profile) return;
-
-      const { data, error } = await supabase
-        .from('saved_creators')
-        .select('id')
-        .eq('member_id', currentUser)
-        .eq('creator_id', profile.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      setIsSaved(!!data);
-    } catch (error) {
-      console.error('Error checking if creator is saved:', error);
-    }
-  };
+  }, [id, user, supabase]);
 
   const handleSaveCreator = async () => {
+    if (!user) return;
+
     try {
       setSavingCreator(true);
-      if (!currentUser || !profile) return;
-
       if (isSaved) {
-        // Remove creator from saved list
+        // Remove from saved creators
         const { error } = await supabase
-          .from('saved_creators')
+          .from("saved_creators")
           .delete()
-          .eq('member_id', currentUser)
-          .eq('creator_id', profile.id);
+          .eq("member_id", user.id)
+          .eq("creator_id", id);
 
         if (error) throw error;
-
         setIsSaved(false);
         toast({
-          title: 'Creator removed from saved list',
-          status: 'success',
-          duration: 2000,
+          title: "Success",
+          description: "Creator removed from saved list",
+          status: "success",
+          duration: 3000,
         });
       } else {
-        // Add creator to saved list
+        // Add to saved creators
         const { error } = await supabase
-          .from('saved_creators')
-          .insert({
-            member_id: currentUser,
-            creator_id: profile.id
-          });
+          .from("saved_creators")
+          .insert([{ member_id: user.id, creator_id: id }]);
 
         if (error) throw error;
-
         setIsSaved(true);
         toast({
-          title: 'Creator saved successfully',
-          status: 'success',
-          duration: 2000,
+          title: "Success",
+          description: "Creator added to saved list",
+          status: "success",
+          duration: 3000,
         });
       }
-    } catch (error) {
-      console.error('Error saving/removing creator:', error);
+    } catch (error: any) {
+      console.error("Error saving creator:", error);
       toast({
-        title: 'Error updating saved creators',
-        status: 'error',
+        title: "Error",
+        description: error.message,
+        status: "error",
         duration: 3000,
       });
     } finally {
@@ -212,33 +170,26 @@ const CreatorProfile: React.FC = () => {
   };
 
   const handleStartChat = async () => {
-    try {
-      if (!profile || !currentUser) {
-        toast({
-          title: 'Cannot start chat',
-          description: 'User information is not available',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
+    if (!user || !creator || !weavyClient || !isConnected) return;
 
-      // Navigate to chat page - the recipient doesn't need to be online
-      navigate('/chat', {
-        state: {
-          selectedChat: {
-            participantId: profile.id,
-            participantName: profile.username
-          }
-        }
+    try {
+      const conversation = await weavyClient.conversations.create({
+        title: `Chat with ${creator.username}`,
+        participants: [user.id, id],
       });
 
-    } catch (error) {
-      console.error('Error in handleStartChat:', error);
       toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        status: 'error',
+        title: "Success",
+        description: "Chat started with creator",
+        status: "success",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Error starting chat:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
         duration: 3000,
       });
     }
@@ -272,13 +223,13 @@ const CreatorProfile: React.FC = () => {
     );
   }
 
-  if (!profile) {
+  if (!creator) {
     return (
       <Center minH="100vh">
         <VStack spacing={4}>
           <Icon as={FiInfo} boxSize={10} color="red.500" />
           <Heading size="md">Creator not found</Heading>
-          <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+          <Button onClick={() => window.history.back()}>Back</Button>
         </VStack>
       </Center>
     );
@@ -361,7 +312,7 @@ const CreatorProfile: React.FC = () => {
         leftIcon={<FiArrowLeft />}
         variant="ghost"
         mb={6}
-        onClick={() => navigate(-1)}
+        onClick={() => window.history.back()}
       >
         Back
       </Button>
@@ -383,33 +334,24 @@ const CreatorProfile: React.FC = () => {
             <HStack spacing={6} align="center" mb={isMobile ? 4 : 0}>
               <Avatar
                 size="2xl"
-                name={profile.username}
-                src={profile.avatar_url || undefined}
+                name={creator.username}
+                src={creator.avatar_url || undefined}
               />
               <VStack align="flex-start" spacing={1}>
-                <Heading size="lg">@{profile.username}</Heading>
-                {profile.headline && (
-                  <Text fontSize="md" fontWeight="medium">{profile.headline}</Text>
+                <Heading size="lg">@{creator.username}</Heading>
+                {creator.display_name && (
+                  <Text fontSize="md" fontWeight="medium">{creator.display_name}</Text>
                 )}
-                {profile.location && (
+                {creator.location && (
                   <HStack>
                     <Icon as={FiMapPin} color="gray.500" />
-                    <Text color="gray.600">{profile.location}</Text>
+                    <Text color="gray.600">{creator.location}</Text>
                   </HStack>
                 )}
-                <HStack spacing={2} mt={1}>
-                  {profile.age && (
-                    <Badge colorScheme="blue">{profile.age} years</Badge>
-                  )}
-                  {profile.gender && (
-                    <Badge colorScheme="purple">{profile.gender}</Badge>
-                  )}
-                  <Badge colorScheme="green">Creator</Badge>
-                </HStack>
               </VStack>
             </HStack>
 
-            {currentUser && currentUser !== profile.id && (
+            {user && user.id !== creator.id && (
               <VStack spacing={2} alignSelf={isMobile ? "stretch" : "flex-start"}>
                 <Button
                   leftIcon={<FiBookmark />}
@@ -426,8 +368,8 @@ const CreatorProfile: React.FC = () => {
                   leftIcon={<FiMessageCircle />}
                   colorScheme="green"
                   onClick={handleStartChat}
-                  isLoading={startingChat || weavyLoading}
-                  isDisabled={!isConnected || weavyLoading}
+                  isLoading={weavyLoading}
+                  isDisabled={!isConnected}
                   w="full"
                 >
                   {weavyLoading ? "Connecting..." : "Start Chat"}
@@ -442,7 +384,7 @@ const CreatorProfile: React.FC = () => {
           {/* Bio Section */}
           <Box>
             <Heading size="md" mb={3}>About</Heading>
-            <Text>{profile.bio || "This creator hasn't added a bio yet."}</Text>
+            <Text>{creator.bio || "This creator hasn't added a bio yet."}</Text>
           </Box>
 
           <Divider />

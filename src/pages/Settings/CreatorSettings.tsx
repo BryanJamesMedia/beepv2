@@ -18,8 +18,9 @@ import {
   Center,
 } from '@chakra-ui/react';
 import { FiUser, FiSettings, FiEdit, FiBell, FiUsers, FiDollarSign, FiBarChart2, FiChevronLeft, FiLogOut } from 'react-icons/fi';
-import { CreatorProfileSettings } from './sections/CreatorProfileSettings';
-import { logout } from '../../utils/auth';
+import CreatorProfileSettings from './sections/CreatorProfileSettings';
+import { signOut } from '../../utils/auth';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 // Define the menu items and their icons
 const menuItems = [
@@ -35,12 +36,21 @@ const menuItems = [
 function CreatorSettings() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const { supabase } = useSupabase();
   
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
   const activeBg = useColorModeValue('blue.50', 'blue.900');
   const activeColor = useColorModeValue('blue.600', 'blue.200');
   const cardBg = useColorModeValue('white', 'gray.700');
+
+  const handleLogout = async () => {
+    try {
+      await signOut(supabase);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const DesktopMenuItems = () => (
     <VStack align="stretch" spacing={1}>
@@ -69,7 +79,7 @@ function CreatorSettings() {
         leftIcon={<FiLogOut />}
         variant="ghost"
         justifyContent="flex-start"
-        onClick={logout}
+        onClick={handleLogout}
       >
         Logout
       </Button>
@@ -111,7 +121,7 @@ function CreatorSettings() {
         colorScheme="red"
         variant="outline"
         w="full"
-        onClick={logout}
+        onClick={handleLogout}
         mt={4}
       >
         Logout

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
 import { useWeavy } from '@weavy/uikit-react';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSupabase } from './SupabaseContext';
 
 interface WeavyContextType {
   weavyClient: any;
@@ -15,14 +15,66 @@ interface CachedToken {
   userId: string;
 }
 
+interface WeavyConfig {
+  url: string;
+  tokenFactory: () => Promise<string>;
+}
+
+interface WeavyInstance {
+  weavy: any;
+  error?: Error;
+}
+
 const TOKEN_CACHE_KEY = 'weavy_token_cache';
 const TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const WeavyContext = createContext<WeavyContextType | undefined>(undefined);
 
-export function WeavyProvider({ children }: { children: ReactNode }) {
+function useWeavyContext() {
+  const context = useContext(WeavyContext);
+  if (!context) {
+    throw new Error('useWeavyContext must be used within a WeavyProvider');
+  }
+  return context;
+}
+
+function useWeavyChat() {
+  const context = useWeavyContext();
+  
+  if (!context.weavyClient) {
+    throw new Error('Weavy client is not initialized');
+  }
+
+  const startChat = async (userId: string) => {
+    try {
+      if (!context.weavyClient) {
+        throw new Error('Weavy client is not initialized');
+      }
+
+      // Create or get existing conversation
+      const conversation = await context.weavyClient.conversation({
+        uid: `chat-${userId}`,
+        type: 'messenger'
+      });
+
+      return conversation;
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      throw error;
+    }
+  };
+
+  return {
+    startChat,
+    isConnected: context.isConnected,
+    isLoading: context.isLoading,
+    error: context.error
+  };
+}
+
+function WeavyProvider({ children }: { children: ReactNode }) {
   const WEAVY_URL = import.meta.env.VITE_WEAVY_URL;
-  const supabaseClient = useSupabaseClient();
+  const { supabase } = useSupabase();
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
@@ -69,113 +121,96 @@ export function WeavyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const weavyConfig = {
-    url: WEAVY_URL,
-    tokenFactory: async (refresh?: boolean) => {
-      try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        
-        if (!session) {
-          clearCachedToken();
-          throw new Error('No active session');
-        }
-
-        // If not refreshing, try to use cached token
-        if (!refresh) {
-          const cachedToken = getCachedToken(session.user.id);
-          if (cachedToken) {
-            return cachedToken.token;
-          }
-        } else {
-          // Clear cached token if refreshing
-          clearCachedToken();
-        }
-
-        // Get new token from backend
-        const response = await fetch('https://nmeducgrjydnzlqkyxtf.supabase.co/functions/v1/weavy-token', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch Weavy token');
-        }
-
-        const data = await response.json();
-        
-        // Cache the new token
-        if (data.token && data.expiresIn) {
-          cacheToken(data.token, session.user.id, data.expiresIn);
-        }
-
-        return data.token;
-      } catch (error) {
-        console.error('Error generating Weavy token:', error);
-        setError(error as Error);
-        throw error;
+  const getValidToken = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        clearCachedToken();
+        throw new Error('No active session');
       }
+
+      // If not refreshing, try to use cached token
+      const cachedToken = getCachedToken(session.user.id);
+      if (cachedToken) {
+        return cachedToken.token;
+      }
+
+      // Get new token from backend
+      const response = await fetch('https://nmeducgrjydnzlqkyxtf.supabase.co/functions/v1/weavy-token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Weavy token');
+      }
+
+      const data = await response.json();
+      
+      // Cache the new token
+      if (data.token && data.expiresIn) {
+        cacheToken(data.token, session.user.id, data.expiresIn);
+      }
+
+      return data.token;
+    } catch (error) {
+      console.error('Error generating Weavy token:', error);
+      setError(error instanceof Error ? error : new Error('Failed to get token'));
+      throw error;
     }
   };
 
-  const weavyResult = useWeavy(weavyConfig);
+  const tokenFactory = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
+      }
+      return session.access_token;
+    } catch (err) {
+      const newError = err instanceof Error ? err : new Error('Failed to get token');
+      setError(newError);
+      return null;
+    }
+  };
+
+  const weavyConfig = {
+    url: WEAVY_URL,
+    tokenFactory
+  };
+
+  const weavy = useWeavy(weavyConfig);
 
   useEffect(() => {
-    if (weavyResult) {
-      const { weavy } = weavyResult;
-      
-      const handleConnectionChange = (connected: boolean) => {
-        setIsConnected(connected);
+    if (weavy) {
+      (weavy as any).on('connected', () => {
+        setIsConnected(true);
         setIsLoading(false);
-      };
+      });
 
-      if (weavy) {
-        handleConnectionChange(true);
-      }
-
-      return () => {
-        if (weavy) {
-          handleConnectionChange(false);
-          // Clear token cache on unmount
-          clearCachedToken();
-        }
-      };
+      (weavy as any).on('error', (e: Error) => {
+        setError(e);
+        setIsLoading(false);
+      });
     }
-  }, [weavyResult]);
+  }, [weavy]);
 
-  if (!weavyResult) {
-    return (
-      <WeavyContext.Provider value={{ 
-        weavyClient: null, 
-        isConnected: false, 
-        isLoading: true,
-        error 
-      }}>
-        {children}
-      </WeavyContext.Provider>
-    );
-  }
-
-  const { weavy } = weavyResult;
+  const value: WeavyContextType = {
+    weavyClient: weavy,
+    isLoading,
+    isConnected,
+    error
+  };
 
   return (
-    <WeavyContext.Provider value={{ 
-      weavyClient: weavy, 
-      isConnected, 
-      isLoading,
-      error 
-    }}>
+    <WeavyContext.Provider value={value}>
       {children}
     </WeavyContext.Provider>
   );
 }
 
-export function useWeavyChat() {
-  const context = useContext(WeavyContext);
-  if (context === undefined) {
-    throw new Error('useWeavyChat must be used within a WeavyProvider');
-  }
-  return context;
-} 
+export { WeavyContext as default, WeavyProvider, useWeavyContext, useWeavyChat }; 

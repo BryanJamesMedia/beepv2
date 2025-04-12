@@ -20,8 +20,9 @@ import {
 import { FiUser, FiSettings, FiLock, FiBell, FiHelpCircle, FiChevronLeft, FiLogOut, FiBookmark } from 'react-icons/fi';
 import { BiWallet, BiQr } from 'react-icons/bi';
 import { MdPayment } from 'react-icons/md';
-import { ProfileSettings } from './sections/ProfileSettings';
-import { logout } from '../../utils/auth';
+import ProfileSettings from './sections/ProfileSettings';
+import { signOut } from '../../utils/auth';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 // Define the menu items and their icons
 const menuItems = [
@@ -39,12 +40,21 @@ const menuItems = [
 function MemberSettings() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const { supabase } = useSupabase();
   
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
   const activeBg = useColorModeValue('blue.50', 'blue.900');
   const activeColor = useColorModeValue('blue.600', 'blue.200');
   const cardBg = useColorModeValue('white', 'gray.700');
+
+  const handleLogout = async () => {
+    try {
+      await signOut(supabase);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const DesktopMenuItems = () => (
     <VStack align="stretch" spacing={1}>
@@ -73,7 +83,7 @@ function MemberSettings() {
         leftIcon={<FiLogOut />}
         variant="ghost"
         justifyContent="flex-start"
-        onClick={logout}
+        onClick={handleLogout}
       >
         Logout
       </Button>
@@ -115,7 +125,7 @@ function MemberSettings() {
         colorScheme="red"
         variant="outline"
         w="full"
-        onClick={logout}
+        onClick={handleLogout}
         mt={4}
       >
         Logout

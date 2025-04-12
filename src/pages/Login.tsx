@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { supabase } from '../config/supabase';
+import { useSupabase } from '../contexts/SupabaseContext';
 import {
   Box,
   Button,
@@ -18,43 +18,50 @@ import {
   AlertIcon,
   Card,
   CardBody,
+  useToast,
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 
 function Login() {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { supabase } = useSupabase();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'email') {
+      setEmail(value);
+    } else if (name === 'password') {
+      setPassword(value);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
       if (error) throw error;
 
-      navigate('/chat');
-    } catch (err: any) {
-      setError(err.message || 'Failed to log in');
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: 'Error logging in',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -74,14 +81,14 @@ function Login() {
               </Alert>
             )}
             
-            <Box as="form" onSubmit={handleSubmit} width="100%">
+            <Box as="form" onSubmit={handleLogin} width="100%">
               <VStack spacing={4}>
                 <FormControl isRequired>
                   <FormLabel>Email</FormLabel>
                   <Input
                     name="email"
                     type="email"
-                    value={formData.email}
+                    value={email}
                     onChange={handleChange}
                     placeholder="Enter your email"
                   />
@@ -93,7 +100,7 @@ function Login() {
                     <Input
                       name="password"
                       type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
+                      value={password}
                       onChange={handleChange}
                       placeholder="Enter your password"
                     />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   VStack,
@@ -21,24 +21,41 @@ import {
   HStack,
   Avatar,
   Center,
+  useToast,
+  Spinner,
 } from '@chakra-ui/react';
 import { FiSearch, FiShare2, FiGrid, FiBookmark } from 'react-icons/fi';
-import { supabase } from '../../config/supabase';
 import useCustomToast from '../../hooks/useCustomToast';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { SearchIcon, AddIcon } from '@chakra-ui/icons';
+
+interface Creator {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
+interface ToastParams {
+  title: string;
+  description?: string;
+  status: 'success' | 'error' | 'warning' | 'info';
+  duration: number;
+}
 
 interface SavedCreatorsProps {
   userRole: 'member' | 'creator';
 }
 
 const SavedCreators: React.FC<SavedCreatorsProps> = ({ userRole }) => {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [searchResults, setSearchResults] = React.useState<any[]>([]);
-  const [isSearching, setIsSearching] = React.useState(false);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Creator[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const inviteDisclosure = useDisclosure();
   const searchDisclosure = useDisclosure();
   const qrDisclosure = useDisclosure();
-  const toast = useCustomToast();
+  const toast = useToast();
+  const { supabase, user } = useSupabase();
   
   const buttonBg = useColorModeValue('white', 'gray.700');
   const buttonHoverBg = useColorModeValue('gray.50', 'gray.600');
@@ -49,24 +66,47 @@ const SavedCreators: React.FC<SavedCreatorsProps> = ({ userRole }) => {
     
     setIsSearching(true);
     try {
+      // Get the current session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       // Only members can search for creators to save
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url, display_name')
+        .select('id, username, avatar_url')
         .eq('role', 'creator')
         .ilike('username', `%${searchQuery}%`)
         .limit(5);
         
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
+      if (error) {
+        console.error('Supabase error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      if (!data) {
+        console.log('No creators found for search query:', searchQuery);
+        setSearchResults([]);
+        return;
+      }
+
+      console.log('Found creators:', data);
+      setSearchResults(data);
+    } catch (error: any) {
       console.error('Error searching creators:', error);
       toast({
         title: "Error searching creators",
-        description: error.message,
+        description: error?.message || 'An unexpected error occurred',
         status: "error",
         duration: 3000,
-      });
+      } as ToastParams);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -85,67 +125,34 @@ const SavedCreators: React.FC<SavedCreatorsProps> = ({ userRole }) => {
   };
 
   // Handle saving a creator
-  const saveCreator = async (creatorId) => {
-    setIsSaving(true);
+  const handleSaveCreator = async (creatorId: string) => {
+    if (!user) return;
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Authentication error",
-          description: "Please sign in to save creators",
-          status: "error",
-          duration: 3000,
-        });
-        return;
-      }
-
-      // Check if this creator is already saved
-      const { data: existingSaved, error: checkError } = await supabase
-        .from('saved_creators')
-        .select('id')
-        .eq('member_id', session.user.id)
-        .eq('creator_id', creatorId)
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
-
-      // If already saved, notify user
-      if (existingSaved) {
-        toast({
-          title: "Creator already saved",
-          status: "info",
-          duration: 2000,
-        });
-        return;
-      }
-
-      // Save the creator
       const { error } = await supabase
         .from('saved_creators')
-        .insert([{
-          member_id: session.user.id,
-          creator_id: creatorId
-        }]);
+        .insert({ member_id: user.id, creator_id: creatorId });
 
       if (error) throw error;
 
       toast({
-        title: "Creator saved successfully",
+        title: "Creator saved",
+        description: "You can now start chatting with this creator",
         status: "success",
-        duration: 2000,
-      });
-    } catch (error) {
+        duration: 3000,
+      } as ToastParams);
+
+      // Clear search results after saving
+      setSearchResults([]);
+      setSearchQuery('');
+    } catch (error: any) {
       console.error('Error saving creator:', error);
       toast({
         title: "Error saving creator",
-        description: error.message,
+        description: error?.message || 'An unexpected error occurred',
         status: "error",
         duration: 3000,
-      });
-    } finally {
-      setIsSaving(false);
+      } as ToastParams);
     }
   };
 
@@ -289,71 +296,47 @@ const SavedCreators: React.FC<SavedCreatorsProps> = ({ userRole }) => {
       <Modal isOpen={searchDisclosure.isOpen} onClose={searchDisclosure.onClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>
-            Search Creators
-          </ModalHeader>
+          <ModalHeader>Search Creators</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
-            <VStack spacing={4} align="stretch">
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <Icon as={FiSearch} color="gray.400" />
-                </InputLeftElement>
-                <Input
-                  placeholder="Search for creators..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                />
-              </InputGroup>
-              
-              <Button 
-                colorScheme="blue" 
-                onClick={handleSearch}
-                isLoading={isSearching}
-              >
-                Search
-              </Button>
-              
-              {searchResults.length > 0 ? (
-                <VStack spacing={2} align="stretch">
-                  {searchResults.map(creator => (
-                    <HStack
-                      key={creator.id}
-                      p={3}
-                      borderWidth="1px"
-                      borderRadius="md"
-                      justify="space-between"
-                    >
-                      <HStack>
-                        <Avatar 
-                          size="sm" 
-                          name={creator.display_name || creator.username}
-                          src={creator.avatar_url}
-                        />
-                        <Text fontWeight="medium">
-                          {creator.display_name || creator.username}
-                        </Text>
-                      </HStack>
-                      <Button
-                        size="sm"
-                        leftIcon={<FiBookmark />}
-                        onClick={() => saveCreator(creator.id)}
-                        isLoading={isSaving}
-                      >
-                        Save
-                      </Button>
+            <InputGroup mb={4}>
+              <InputLeftElement pointerEvents="none">
+                <SearchIcon color="gray.300" />
+              </InputLeftElement>
+              <Input
+                placeholder="Search by username"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </InputGroup>
+
+            {isSearching ? (
+              <Center py={4}>
+                <Spinner />
+              </Center>
+            ) : searchResults.length > 0 ? (
+              <VStack spacing={4} align="stretch">
+                {searchResults.map((creator) => (
+                  <HStack key={creator.id} justify="space-between" p={2} borderWidth="1px" borderRadius="md">
+                    <HStack>
+                      <Avatar size="sm" name={creator.username} src={creator.avatar_url || undefined} />
+                      <Text>{creator.username}</Text>
                     </HStack>
-                  ))}
-                </VStack>
-              ) : (
-                searchQuery && !isSearching && (
-                  <Text textAlign="center" color="gray.500" py={4}>
-                    No results found
-                  </Text>
-                )
-              )}
-            </VStack>
+                    <Button
+                      size="sm"
+                      colorScheme="blue"
+                      onClick={() => handleSaveCreator(creator.id)}
+                      isLoading={isSaving}
+                    >
+                      Save
+                    </Button>
+                  </HStack>
+                ))}
+              </VStack>
+            ) : searchQuery ? (
+              <Text textAlign="center" color="gray.500">No creators found</Text>
+            ) : null}
           </ModalBody>
         </ModalContent>
       </Modal>

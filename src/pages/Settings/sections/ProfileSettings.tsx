@@ -15,123 +15,184 @@ import {
   IconButton,
 } from '@chakra-ui/react';
 import { FiEdit2, FiTrash2 } from 'react-icons/fi';
-import { supabase } from '../../../config/supabase';
+import { useSupabase } from '../../../contexts/SupabaseContext';
 import { debounce } from 'lodash';
 
-export function ProfileSettings() {
-  console.log('ProfileSettings component rendered');
-  const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState({
-    username: '',
-    display_name: '',
-    bio: '',
-    avatar_url: '',
-  });
-  const [isUsernameAvailable, setIsUsernameAvailable] = useState(true);
-  const [usernameError, setUsernameError] = useState('');
+interface ProfileData {
+  id: string;
+  username: string;
+  display_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  location?: string;
+}
+
+const ProfileSettings: React.FC = () => {
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
   const toast = useToast();
+  const { supabase, user } = useSupabase();
 
-  // Get current user's profile on mount
   useEffect(() => {
+    if (!user) return;
+
+    const fetchProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setProfile({
+            id: data.id,
+            username: data.username,
+            display_name: data.display_name,
+            bio: data.bio,
+            avatar_url: data.avatar_url,
+            location: data.location,
+          });
+        }
+      } catch (error: any) {
+        console.error('Error fetching profile:', error);
+        toast({
+          title: 'Error',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchProfile();
-  }, []);
+  }, [user, supabase]);
 
-  const fetchProfile = async () => {
+  const checkUsernameAvailability = async (username: string) => {
+    if (!user) return false;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('username, display_name, bio, avatar_url')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error) throw error;
-      if (data) setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast({
-        title: 'Error fetching profile',
-        status: 'error',
-        duration: 3000,
-      });
-    }
-  };
-
-  // Check username availability with debounce
-  const checkUsername = debounce(async (username: string) => {
-    if (!username) return;
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const { data, error } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
-        .neq('id', session.user.id)
+        .neq('id', user.id)
         .single();
 
-      setIsUsernameAvailable(!data);
-      setUsernameError(data ? 'Username already taken' : '');
-    } catch (error) {
-      console.error('Error checking username:', error);
-    }
-  }, 500);
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
 
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    setProfile({ ...profile, username: value });
-    checkUsername(value);
+      return !data;
+    } catch (error: any) {
+      console.error('Error checking username:', error);
+      return false;
+    }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile) return;
+
+    setSaving(true);
     try {
-      setLoading(true);
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const isAvailable = await checkUsernameAvailability(profile.username);
+      if (!isAvailable) {
+        setUsernameError('Username is already taken');
+        setSaving(false);
+        return;
+      }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: profile.username,
+          display_name: profile.display_name,
+          bio: profile.bio,
+          location: profile.location,
+        })
+        .eq('id', user.id);
 
-      // Upload image to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      setProfile({ ...profile, avatar_url: publicUrl });
+      if (error) throw error;
 
       toast({
-        title: 'Image uploaded successfully',
+        title: 'Success',
+        description: 'Profile updated successfully',
         status: 'success',
         duration: 3000,
       });
-    } catch (error) {
-      console.error('Error uploading image:', error);
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
       toast({
-        title: 'Error uploading image',
+        title: 'Error',
+        description: error.message,
         status: 'error',
         duration: 3000,
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files || !e.target.files[0] || !profile) return;
+
+    const file = e.target.files[0];
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({
+        id: profile.id,
+        username: profile.username,
+        display_name: profile.display_name || "",
+        bio: profile.bio || "",
+        location: profile.location || "",
+        avatar_url: publicUrl,
+      } as ProfileData);
+
+      toast({
+        title: "Success",
+        description: "Avatar updated successfully",
+        status: "success",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Error updating avatar:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
     }
   };
 
   const handleDeleteAvatar = async () => {
+    if (!profile || !profile.avatar_url) return;
+    
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -147,17 +208,21 @@ export function ProfileSettings() {
 
       if (deleteError) throw deleteError;
 
-      setProfile({ ...profile, avatar_url: '' });
+      setProfile({
+        ...profile,
+        avatar_url: undefined
+      });
 
       toast({
         title: 'Profile picture removed',
         status: 'success',
         duration: 3000,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting avatar:', error);
       toast({
-        title: 'Error removing profile picture',
+        title: 'Error',
+        description: error.message,
         status: 'error',
         duration: 3000,
       });
@@ -166,125 +231,105 @@ export function ProfileSettings() {
     }
   };
 
-  const handleSave = async () => {
-    try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+  if (loading) {
+    return <Box>Loading...</Box>;
+  }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          username: profile.username,
-          display_name: profile.display_name,
-          bio: profile.bio,
-          avatar_url: profile.avatar_url,
-          updated_at: new Date(),
-        })
-        .eq('id', session.user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Profile updated successfully',
-        status: 'success',
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast({
-        title: 'Error updating profile',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!profile) {
+    return <Box>Profile not found</Box>;
+  }
 
   return (
-    <VStack spacing={6} align="stretch">
-      {/* Profile Picture Section */}
-      <Box textAlign="center">
-        <FormLabel>Profile Picture</FormLabel>
-        <VStack spacing={4}>
-          <Avatar
-            size="2xl"
-            src={profile.avatar_url}
-            name={profile.display_name || profile.username}
-          />
-          <HStack spacing={2} justify="center">
-            <FormControl w="auto">
+    <Box>
+      <VStack spacing={6} align="stretch">
+        <Box>
+          <Text fontSize="lg" fontWeight="bold" mb={2}>
+            Profile Picture
+          </Text>
+          <VStack spacing={4}>
+            <Avatar
+              size="xl"
+              name={profile?.username ?? ""}
+              src={profile?.avatar_url ?? undefined}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              style={{ display: "none" }}
+              id="avatar-upload"
+            />
+            <Button
+              as="label"
+              htmlFor="avatar-upload"
+              colorScheme="blue"
+              variant="outline"
+            >
+              Change Avatar
+            </Button>
+          </VStack>
+        </Box>
+
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4} align="stretch">
+            <FormControl isInvalid={!!usernameError}>
+              <FormLabel>Username</FormLabel>
               <Input
-                type="file"
-                accept="image/*"
-                display="none"
-                id="avatar-upload"
-                onChange={handleImageUpload}
+                placeholder="username"
+                value={profile.username}
+                onChange={(e) => {
+                  setUsernameError("");
+                  setProfile({ ...profile, username: e.target.value });
+                }}
               />
-              <Button
-                as="label"
-                htmlFor="avatar-upload"
-                leftIcon={<FiEdit2 />}
-                isLoading={loading}
-                cursor="pointer"
-              >
-                Change Picture
-              </Button>
+              {usernameError && (
+                <Text color="red.500" fontSize="sm">
+                  {usernameError}
+                </Text>
+              )}
             </FormControl>
-            {profile.avatar_url && (
-              <IconButton
-                aria-label="Remove picture"
-                icon={<FiTrash2 />}
-                onClick={handleDeleteAvatar}
-                isLoading={loading}
+
+            <FormControl>
+              <FormLabel>Display Name</FormLabel>
+              <Input
+                placeholder="How you want to be known"
+                value={profile.display_name || ''}
+                onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
               />
-            )}
-          </HStack>
-        </VStack>
-      </Box>
+            </FormControl>
 
-      {/* Username Field */}
-      <FormControl isInvalid={!!usernameError}>
-        <FormLabel>Username</FormLabel>
-        <Input
-          placeholder="username"
-          value={profile.username}
-          onChange={handleUsernameChange}
-          isInvalid={!isUsernameAvailable}
-        />
-        <FormErrorMessage>{usernameError}</FormErrorMessage>
-      </FormControl>
+            <FormControl>
+              <FormLabel>Bio</FormLabel>
+              <Input
+                placeholder="Tell us about yourself"
+                value={profile.bio || ''}
+                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              />
+            </FormControl>
 
-      {/* Display Name Field */}
-      <FormControl>
-        <FormLabel>Display Name</FormLabel>
-        <Input
-          placeholder="How you want to be known"
-          value={profile.display_name}
-          onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
-        />
-      </FormControl>
+            <FormControl>
+              <FormLabel>Location</FormLabel>
+              <Input
+                placeholder="Where you are"
+                value={profile.location || ''}
+                onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+              />
+            </FormControl>
 
-      {/* Bio Field */}
-      <FormControl>
-        <FormLabel>Bio</FormLabel>
-        <Input
-          placeholder="Tell us about yourself"
-          value={profile.bio}
-          onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-        />
-      </FormControl>
-
-      {/* Save Button */}
-      <Button
-        colorScheme="blue"
-        onClick={handleSave}
-        isLoading={loading}
-        isDisabled={!isUsernameAvailable || loading}
-      >
-        Save Changes
-      </Button>
-    </VStack>
+            <Button
+              type="submit"
+              colorScheme="blue"
+              isLoading={saving}
+              loadingText="Saving..."
+              isDisabled={!!usernameError || saving}
+            >
+              Save Changes
+            </Button>
+          </VStack>
+        </form>
+      </VStack>
+    </Box>
   );
-} 
+};
+
+export default ProfileSettings; 

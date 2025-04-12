@@ -22,10 +22,11 @@ import {
   Heading,
 } from '@chakra-ui/react';
 import { FiEdit2, FiTrash2, FiPlusCircle, FiX } from 'react-icons/fi';
-import { supabase } from '../../../config/supabase';
+import { useSupabase } from '../../../contexts/SupabaseContext';
 import { debounce } from 'lodash';
 
-export function CreatorProfileSettings() {
+const CreatorProfileSettings: React.FC = () => {
+  const { supabase, user } = useSupabase();
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState({
     username: '',
@@ -496,4 +497,6 @@ export function CreatorProfileSettings() {
       </Button>
     </VStack>
   );
-} 
+};
+
+export default CreatorProfileSettings; 

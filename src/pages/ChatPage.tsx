@@ -24,7 +24,7 @@ import {
 import { FiPlus, FiMessageCircle } from 'react-icons/fi';
 import { useWeavyChat } from '../contexts/WeavyContext';
 import { WyChat } from '@weavy/uikit-react';
-import { supabase } from '../config/supabase';
+import { useSupabase } from '../contexts/SupabaseContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface ChatMember {
@@ -57,6 +57,7 @@ export function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as NavigationState;
+  const { supabase, user } = useSupabase();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [savedCreators, setSavedCreators] = useState<SavedCreator[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(false);

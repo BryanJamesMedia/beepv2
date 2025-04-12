@@ -1,205 +1,181 @@
-import React, { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   VStack,
-  Heading,
-  Text,
-  Divider,
   HStack,
+  Text,
   Avatar,
-  Spinner,
   Button,
-  Icon,
-  useColorModeValue,
   useToast,
-  Flex,
-  Link,
-} from '@chakra-ui/react';
-import { FiTrash2, FiEye } from 'react-icons/fi';
-import { supabase } from '../../config/supabase';
+} from "@chakra-ui/react";
+import { FiMessageCircle, FiEye } from "react-icons/fi";
+import { useSupabase } from "../../contexts/SupabaseContext";
+import { useWeavyChat } from "../../contexts/WeavyContext";
+import { useNavigate } from "react-router-dom";
+
+interface SavedCreator {
+  id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+}
 
 const SavedCreatorsList: React.FC = () => {
-  const [savedCreators, setSavedCreators] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [savedCreators, setSavedCreators] = useState<SavedCreator[]>([]);
+  const [loading, setLoading] = useState(true);
   const toast = useToast();
-  const emptyTextColor = useColorModeValue('gray.500', 'gray.400');
-  const cardBg = useColorModeValue('white', 'gray.700');
-  const cardHoverBg = useColorModeValue('gray.50', 'gray.600');
+  const { supabase, user } = useSupabase();
+  const { weavyClient, isConnected, isLoading: weavyLoading } = useWeavyChat();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchSavedCreators();
-  }, []);
+    if (!user) return;
 
-  const fetchSavedCreators = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setIsLoading(false);
-        return;
-      }
+    const fetchSavedCreators = async () => {
+      try {
+        // First, get the saved creator IDs
+        const { data: savedData, error: savedError } = await supabase
+          .from("saved_creators")
+          .select("creator_id")
+          .eq("member_id", user.id);
 
-      // Get saved creator IDs
-      const { data: savedData, error: savedError } = await supabase
-        .from('saved_creators')
-        .select('creator_id')
-        .eq('member_id', session.user.id);
+        if (savedError) throw savedError;
 
-      if (savedError) throw savedError;
+        if (!savedData || savedData.length === 0) {
+          setSavedCreators([]);
+          setLoading(false);
+          return;
+        }
 
-      if (savedData && savedData.length > 0) {
-        // Get creator profiles from the IDs
+        // Then, get the creator profiles
         const creatorIds = savedData.map(item => item.creator_id);
-        
         const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, display_name, headline, location')
-          .in('id', creatorIds);
+          .from("profiles")
+          .select("id, username, avatar_url, bio")
+          .in("id", creatorIds);
 
         if (profilesError) throw profilesError;
-        
-        setSavedCreators(profilesData || []);
-      } else {
-        setSavedCreators([]);
+
+        if (profilesData) {
+          setSavedCreators(profilesData.map(profile => ({
+            id: profile.id,
+            username: profile.username,
+            avatar_url: profile.avatar_url,
+            bio: profile.bio,
+          })));
+        }
+      } catch (error: any) {
+        console.error("Error fetching saved creators:", error);
+        toast({
+          title: "Error",
+          description: error.message,
+          status: "error",
+          duration: 3000,
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching saved creators:', error);
-      toast({
-        title: "Error loading saved creators",
-        status: "error",
-        duration: 3000,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const removeCreator = async (creatorId: string) => {
-    setIsRemoving(true);
+    fetchSavedCreators();
+  }, [user, supabase]);
+
+  const handleStartChat = async (creatorId: string, creatorUsername: string) => {
+    if (!user || !weavyClient || !isConnected) return;
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { error } = await supabase
-        .from('saved_creators')
-        .delete()
-        .eq('member_id', session.user.id)
-        .eq('creator_id', creatorId);
-
-      if (error) throw error;
-
-      // Update the list after removing
-      setSavedCreators(savedCreators.filter(creator => creator.id !== creatorId));
-      
-      toast({
-        title: "Creator removed from saved list",
-        status: "success",
-        duration: 2000,
+      const conversation = await weavyClient.conversations.create({
+        title: `Chat with ${creatorUsername}`,
+        participants: [user.id, creatorId],
       });
-    } catch (error) {
-      console.error('Error removing saved creator:', error);
+
       toast({
-        title: "Error removing creator",
+        title: "Success",
+        description: "Chat started with creator",
+        status: "success",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Error starting chat:", error);
+      toast({
+        title: "Error",
+        description: error.message,
         status: "error",
         duration: 3000,
       });
-    } finally {
-      setIsRemoving(false);
     }
   };
+
+  const handleViewProfile = (creatorId: string) => {
+    navigate(`/creator/${creatorId}`);
+  };
+
+  if (loading) {
+    return <Box>Loading...</Box>;
+  }
+
+  if (savedCreators.length === 0) {
+    return (
+      <Box textAlign="center" py={8}>
+        <Text color="gray.500">No saved creators yet</Text>
+      </Box>
+    );
+  }
 
   return (
-    <Box mt={6}>
-      <Heading size="md" mb={4}>Saved Creators</Heading>
-      
-      {isLoading ? (
-        <Box textAlign="center" py={8}>
-          <Spinner size="xl" color="blue.500" />
-          <Text mt={4}>Loading saved creators...</Text>
-        </Box>
-      ) : savedCreators.length > 0 ? (
-        <VStack spacing={2} align="stretch">
-          {savedCreators.map((creator, index) => (
-            <Box 
-              key={creator.id}
-              p={4} 
-              borderWidth="1px" 
-              borderRadius="lg"
-              bg={cardBg}
-              _hover={{ boxShadow: 'md', bg: cardHoverBg }}
-              transition="all 0.2s"
-            >
-              <Flex justify="space-between" wrap={{ base: "wrap", md: "nowrap" }}>
-                <HStack spacing={4} mb={{ base: 3, md: 0 }} flex="1">
-                  <Avatar 
-                    size="md" 
-                    name={creator.username} 
-                    src={creator.avatar_url}
-                  />
-                  <VStack align="start" spacing={0}>
-                    <Link 
-                      as={RouterLink} 
-                      to={`/creator/${creator.id}`}
-                      fontWeight="bold"
-                      _hover={{ color: 'blue.500', textDecoration: 'none' }}
-                    >
-                      @{creator.username}
-                    </Link>
-                    {creator.headline && (
-                      <Text fontSize="sm" color="gray.600" noOfLines={1}>
-                        {creator.headline}
-                      </Text>
-                    )}
-                    {creator.location && (
-                      <Text fontSize="xs" color={emptyTextColor}>
-                        {creator.location}
-                      </Text>
-                    )}
-                  </VStack>
-                </HStack>
-                
-                <HStack>
-                  <Button
-                    as={RouterLink}
-                    to={`/creator/${creator.id}`}
-                    size="sm"
-                    leftIcon={<Icon as={FiEye} />}
-                    colorScheme="blue"
-                    variant="outline"
-                  >
-                    View
-                  </Button>
-                  <Button
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    leftIcon={<Icon as={FiTrash2} />}
-                    onClick={() => removeCreator(creator.id)}
-                    isLoading={isRemoving}
-                  >
-                    Remove
-                  </Button>
-                </HStack>
-              </Flex>
-            </Box>
-          ))}
-        </VStack>
-      ) : (
-        <Box 
-          py={8} 
-          textAlign="center" 
-          borderWidth="1px" 
-          borderRadius="lg"
-          bg={cardBg}
+    <VStack spacing={4} align="stretch">
+      {savedCreators.map((creator) => (
+        <Box
+          key={creator.id}
+          p={4}
+          borderWidth="1px"
+          borderRadius="md"
+          _hover={{ bg: "gray.50" }}
         >
-          <Text color={emptyTextColor}>
-            No creators saved yet. Search and save creators you're interested in.
-          </Text>
+          <HStack justify="space-between">
+            <HStack spacing={3}>
+              <Avatar
+                size="md"
+                name={creator.username}
+                src={creator.avatar_url}
+              />
+              <Box>
+                <Text fontWeight="bold">
+                  {creator.username}
+                </Text>
+                {creator.bio && (
+                  <Text fontSize="sm" color="gray.600" noOfLines={1}>
+                    {creator.bio}
+                  </Text>
+                )}
+              </Box>
+            </HStack>
+            <HStack spacing={2}>
+              <Button
+                leftIcon={<FiEye />}
+                colorScheme="blue"
+                variant="outline"
+                size="sm"
+                onClick={() => handleViewProfile(creator.id)}
+              >
+                View
+              </Button>
+              <Button
+                leftIcon={<FiMessageCircle />}
+                colorScheme="blue"
+                size="sm"
+                onClick={() => handleStartChat(creator.id, creator.username)}
+                isLoading={weavyLoading}
+                isDisabled={!isConnected}
+              >
+                Chat
+              </Button>
+            </HStack>
+          </HStack>
         </Box>
-      )}
-    </Box>
+      ))}
+    </VStack>
   );
 };
 

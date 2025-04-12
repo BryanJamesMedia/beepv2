@@ -12,9 +12,11 @@ import {
   Circle,
   Divider,
   Skeleton,
+  Badge,
+  useToast,
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { formatMessageTime } from '../../utils/dateFormat';
 import { generateChatRoomId } from '../../utils/chatUtils';
 
@@ -50,93 +52,103 @@ function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const toast = useToast();
+  const { supabase, user } = useSupabase();
 
   useEffect(() => {
-    fetchChats();
-  }, []);
+    if (!user) return;
 
-  const fetchChats = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+    const fetchChats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("chats")
+          .select(`
+            id,
+            last_message,
+            last_message_time,
+            unread_count,
+            other_user:profiles!chats_other_user_id_fkey (
+              id,
+              username,
+              avatar_url
+            )
+          `)
+          .eq("user_id", user.id)
+          .order("last_message_time", { ascending: false });
 
-      const userId = session.user.id;
-      
-      // Fetch existing chats where the current user is either the initiator or participant
-      const { data: chatData, error: chatError } = await supabase
-        .from('chats')
-        .select('*')
-        .or(`initiator_id.eq.${userId},participant_id.eq.${userId}`);
-        
-      if (chatError) {
-        console.error('Error fetching chats:', chatError);
-      }
-      
-      // Convert chat data to our ChatPreview format
-      const existingChats = (chatData || []).map(chat => {
-        // Determine if current user is the initiator or participant
-        const isInitiator = chat.initiator_id === userId;
-        
-        return {
-          id: chat.id,
-          participantId: isInitiator ? chat.participant_id : chat.initiator_id,
-          participantName: isInitiator ? chat.participant_name : chat.initiator_name,
-          participantAvatar: '', // We don't have this info in the chats table
-          lastMessage: chat.last_message || 'Start chatting...',
-          lastMessageTime: chat.last_message_time || chat.created_at,
-          unreadCount: chat.unread_count || 0,
-        };
-      });
-      
-      // Now fetch saved creators that are not already in our chat list
-      const existingChatIds = new Set(existingChats.map(chat => chat.participantId));
-      
-      const { data: savedCreatorsData, error: savedError } = await supabase
-        .from('saved_creators')
-        .select(`
-          id,
-          creator_id,
-          creator:profiles!saved_creators_creator_id_fkey (
-            username,
-            avatar_url
-          )
-        `)
-        .eq('member_id', userId);
+        if (error) throw error;
 
-      if (savedError) {
-        console.error('Error fetching saved creators:', savedError);
-        throw savedError;
-      }
-      
-      // Make TypeScript happy by asserting the type
-      const savedCreators = savedCreatorsData as unknown as SavedCreator[];
-
-      // Transform saved creators to ChatPreview format (only those not already in chat)
-      const savedCreatorChats = savedCreators
-        .filter(item => !existingChatIds.has(item.creator_id))
-        .map(item => {
-          // Generate room ID using the utility function
-          const roomId = generateChatRoomId(session.user.id, item.creator_id);
-          
+        // Convert chat data to our ChatPreview format
+        const existingChats = (data || []).map(chat => {
           return {
-            id: roomId,
-            participantId: item.creator_id,
-            participantName: item.creator.username || 'Unknown',
-            participantAvatar: item.creator.avatar_url || '',
-            lastMessage: 'Start chatting...',
-            lastMessageTime: new Date().toISOString(),
-            unreadCount: 0,
+            id: chat.id,
+            participantId: chat.other_user.id,
+            participantName: chat.other_user.username,
+            participantAvatar: chat.other_user.avatar_url || '',
+            lastMessage: chat.last_message || 'Start chatting...',
+            lastMessageTime: chat.last_message_time || chat.created_at,
+            unreadCount: chat.unread_count || 0,
           };
         });
+        
+        // Now fetch saved creators that are not already in our chat list
+        const existingChatIds = new Set(existingChats.map(chat => chat.participantId));
+        
+        const { data: savedCreatorsData, error: savedError } = await supabase
+          .from('saved_creators')
+          .select(`
+            id,
+            creator_id,
+            creator:profiles!saved_creators_creator_id_fkey (
+              username,
+              avatar_url
+            )
+          `)
+          .eq('member_id', user.id);
 
-      // Combine both sources of chats, prioritizing active chats
-      setChats([...existingChats, ...savedCreatorChats]);
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        if (savedError) {
+          console.error('Error fetching saved creators:', savedError);
+          throw savedError;
+        }
+        
+        // Make TypeScript happy by asserting the type
+        const savedCreators = savedCreatorsData as unknown as SavedCreator[];
+
+        // Transform saved creators to ChatPreview format (only those not already in chat)
+        const savedCreatorChats = savedCreators
+          .filter(item => !existingChatIds.has(item.creator_id))
+          .map(item => {
+            // Generate room ID using the utility function
+            const roomId = generateChatRoomId(user.id, item.creator_id);
+            
+            return {
+              id: roomId,
+              participantId: item.creator_id,
+              participantName: item.creator.username || 'Unknown',
+              participantAvatar: item.creator.avatar_url || '',
+              lastMessage: 'Start chatting...',
+              lastMessageTime: new Date().toISOString(),
+              unreadCount: 0,
+            };
+          });
+
+        // Combine both sources of chats, prioritizing active chats
+        setChats([...existingChats, ...savedCreatorChats]);
+      } catch (error: any) {
+        console.error('Error fetching chats:', error);
+        toast({
+          title: 'Error',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchChats();
+  }, [user, supabase]);
 
   const filteredChats = chats.filter(chat =>
     chat.participantName.toLowerCase().includes(searchQuery.toLowerCase()) ||

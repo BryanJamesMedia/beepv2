@@ -19,12 +19,13 @@ import {
   Center,
   Skeleton,
   SkeletonCircle,
+  GridItem,
+  useToast,
 } from '@chakra-ui/react';
 import { AddIcon, ChatIcon } from '@chakra-ui/icons';
 import TopMenu from '../../components/TopMenu';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { FiMessageSquare } from 'react-icons/fi';
-import useCustomToast from '../../hooks/useCustomToast';
 
 // Define the types for follower data
 interface FollowerMember {
@@ -40,67 +41,47 @@ interface Follower {
 }
 
 function CreatorDashboard() {
-  const [followers, setFollowers] = useState<Follower[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const toast = useCustomToast();
+  const [savedCreators, setSavedCreators] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const { supabase, user } = useSupabase();
 
   useEffect(() => {
-    fetchFollowers();
-  }, []);
-
-  const fetchFollowers = async () => {
-    try {
-      setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+    async function fetchSavedCreators() {
+      if (!user) return;
       
-      if (!session) {
-        console.log("No session found");
-        return;
-      }
+      try {
+        const { data, error } = await supabase
+          .from('saved_creators')
+          .select(`
+            creator:profiles (
+              id,
+              username,
+              avatar_url,
+              display_name,
+              headline
+            )
+          `)
+          .eq('member_id', user.id);
 
-      // First check if the table exists
-      const { error: tableCheckError } = await supabase
-        .from('saved_creators')
-        .select('id')
-        .limit(1);
+        if (error) throw error;
 
-      if (tableCheckError) {
-        console.error("Table check error:", tableCheckError);
+        setSavedCreators(data?.map(item => item.creator) || []);
+      } catch (error: any) {
+        console.error('Error fetching saved creators:', error);
         toast({
-          title: 'Database table not ready. Please run the SQL setup script.',
+          title: 'Error',
+          description: error.message,
           status: 'error',
-          duration: 5000,
+          duration: 3000,
         });
-        setIsLoading(false);
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      // Get members who have saved this creator
-      const { data, error } = await supabase
-        .from('saved_creators')
-        .select(`
-          member_id,
-          member:member_id(id, username, display_name, avatar_url)
-        `)
-        .eq('creator_id', session.user.id);
-
-      if (error) {
-        console.error("Followers query error:", error);
-        throw error;
-      }
-      
-      setFollowers(data || []);
-    } catch (error) {
-      console.error('Error fetching followers:', error);
-      toast({
-        title: 'Error loading follower data',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    fetchSavedCreators();
+  }, [user, supabase]);
 
   const startChat = (memberId: string) => {
     // Logic to start a chat with a follower
@@ -140,7 +121,7 @@ function CreatorDashboard() {
             <CardBody>
               <Stat>
                 <StatLabel>Total Followers</StatLabel>
-                <StatNumber>{followers.length}</StatNumber>
+                <StatNumber>{savedCreators.length}</StatNumber>
                 <StatHelpText>Members who saved your profile</StatHelpText>
               </Stat>
             </CardBody>
@@ -152,7 +133,7 @@ function CreatorDashboard() {
           <Heading size="md" mb={4}>Your Followers</Heading>
           <Card>
             <CardBody>
-              {isLoading ? (
+              {loading ? (
                 // Loading skeletons
                 Array(3).fill(0).map((_, i) => (
                   <Box key={i} mb={i < 2 ? 4 : 0}>
@@ -167,34 +148,34 @@ function CreatorDashboard() {
                     {i < 2 && <Divider my={4} />}
                   </Box>
                 ))
-              ) : followers.length > 0 ? (
+              ) : savedCreators.length > 0 ? (
                 // Followers list
-                followers.map((follower, index) => (
-                  <Box key={follower.member_id}>
+                savedCreators.map((creator, index) => (
+                  <Box key={creator.id}>
                     <HStack justify="space-between" align="center">
                       <HStack>
                         <Avatar 
                           size="md" 
-                          name={follower.member.display_name || follower.member.username} 
-                          src={follower.member.avatar_url}
+                          name={creator.display_name || creator.username} 
+                          src={creator.avatar_url}
                         />
                         <Box>
                           <Text fontWeight="bold">
-                            {follower.member.display_name || follower.member.username}
+                            {creator.display_name || creator.username}
                           </Text>
-                          <Text fontSize="sm" color="gray.500">Follower</Text>
+                          <Text fontSize="sm" color="gray.500">{creator.headline}</Text>
                         </Box>
                       </HStack>
                       <Button 
                         leftIcon={<FiMessageSquare />} 
                         colorScheme="blue" 
                         size="sm"
-                        onClick={() => startChat(follower.member_id)}
+                        onClick={() => startChat(creator.id)}
                       >
                         Chat
                       </Button>
                     </HStack>
-                    {index < followers.length - 1 && <Divider my={4} />}
+                    {index < savedCreators.length - 1 && <Divider my={4} />}
                   </Box>
                 ))
               ) : (

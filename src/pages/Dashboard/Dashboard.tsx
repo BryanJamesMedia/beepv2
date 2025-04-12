@@ -1,28 +1,27 @@
-import React, { useEffect, useState } from 'react';
 import { Box, Spinner, Center } from '@chakra-ui/react';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import CreatorDashboard from './CreatorDashboard';
 import MemberDashboard from './MemberDashboard';
+import { useEffect, useState } from 'react';
 
 function Dashboard() {
+  const { supabase, user } = useSupabase();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function getUserRole() {
+      if (!user) return;
+      
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
 
-          if (error) throw error;
-          setUserRole(profile.role);
-        }
+        if (error) throw error;
+        setUserRole(profile.role);
       } catch (error) {
         console.error('Error fetching user role:', error);
       } finally {
@@ -31,7 +30,7 @@ function Dashboard() {
     }
 
     getUserRole();
-  }, []);
+  }, [user, supabase]);
 
   if (loading) {
     return (

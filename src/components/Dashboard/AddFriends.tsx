@@ -24,7 +24,7 @@ import {
   Center,
 } from '@chakra-ui/react';
 import { FiUserPlus, FiSearch, FiShare2, FiGrid } from 'react-icons/fi';
-import { supabase } from '../../config/supabase';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import useCustomToast from '../../hooks/useCustomToast';
 
 interface AddFriendsProps {
@@ -32,6 +32,7 @@ interface AddFriendsProps {
 }
 
 const AddFriends: React.FC<AddFriendsProps> = ({ userRole }) => {
+  const { supabase, user } = useSupabase();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<any[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
