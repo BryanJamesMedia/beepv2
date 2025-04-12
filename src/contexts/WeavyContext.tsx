@@ -1,66 +1,36 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useWeavy, WyChat } from '@weavy/uikit-react';
-import { supabase } from '../config/supabase';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useWeavy } from '@weavy/uikit-react';
 
 interface WeavyContextType {
-  weavyClient: any | null;
+  weavyClient: any;
   isConnected: boolean;
 }
 
-const WeavyContext = createContext<WeavyContextType>({
-  weavyClient: null,
-  isConnected: false,
-});
+const WeavyContext = createContext<WeavyContextType | undefined>(undefined);
 
-export const useWeavyChat = () => useContext(WeavyContext);
-
-export function WeavyProvider({ children }: { children: React.ReactNode }) {
-  const [weavyClient, setWeavyClient] = useState<any | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const setupWeavy = async () => {
-      try {
-        // Get current user session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log('Setting up Weavy with user ID:', session.user.id);
-          
-          // Initialize Weavy client
-          const client = useWeavy({
-            url: import.meta.env.VITE_WEAVY_URL,
-            tokenFactory: async () => {
-              // Get a fresh token from your backend
-              const { data: { token }, error } = await supabase.functions.invoke('weavy-token', {
-                body: { userId: session.user.id }
-              });
-              
-              if (error) throw error;
-              return token;
-            }
-          });
-
-          setWeavyClient(client);
-          setIsConnected(true);
-        } else {
-          console.error('No user session found');
-          setConnectionError('No user session found. Please log in again.');
-        }
-      } catch (error) {
-        console.error('Error connecting to Weavy:', error);
-        setIsConnected(false);
-        setConnectionError(error instanceof Error ? error.message : 'Unknown connection error');
-      }
-    };
-
-    setupWeavy();
-  }, []);
+export function WeavyProvider({ children }: { children: ReactNode }) {
+  const WEAVY_URL = import.meta.env.VITE_WEAVY_URL;
+  
+  const { weavy: weavyClient, isConnected } = useWeavy({
+    url: WEAVY_URL,
+    tokenFactory: async () => {
+      // For now, we'll use a placeholder token
+      // In production, you should generate a proper JWT token
+      return 'placeholder-token';
+    }
+  });
 
   return (
     <WeavyContext.Provider value={{ weavyClient, isConnected }}>
       {children}
     </WeavyContext.Provider>
   );
+}
+
+export function useWeavyChat() {
+  const context = useContext(WeavyContext);
+  if (context === undefined) {
+    throw new Error('useWeavyChat must be used within a WeavyProvider');
+  }
+  return context;
 } 

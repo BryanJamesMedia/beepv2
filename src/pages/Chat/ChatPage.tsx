@@ -7,7 +7,7 @@ import {
   useBreakpointValue
 } from '@chakra-ui/react';
 import ChatList from '../../components/ChatList/ChatList';
-import { ChatRoom } from '../../components/ChatRoom/ChatRoom';
+import { ChatRoom } from '../../components/Chat/ChatRoom';
 
 interface Chat {
   id: string;
@@ -56,14 +56,7 @@ function ChatPage() {
       {showChatRoom && (
         <GridItem bg="gray.50" overflowY="auto">
           {selectedChat ? (
-            <ChatRoom
-              roomId={selectedChat.id}
-              participant={{
-                id: selectedChat.participantId,
-                name: selectedChat.participantName
-              }}
-              onBack={() => setSelectedChat(null)}
-            />
+            <ChatRoom roomId={selectedChat.id} />
           ) : (
             <Box p={8} textAlign="center" color="gray.500">
               Select a chat to start messaging

@@ -12,6 +12,7 @@ import CreatorSignup from './pages/CreatorSignup';
 import MemberSignup from './pages/MemberSignup';
 import ChatList from './components/ChatList/ChatList';
 import { AblyProvider } from './contexts/AblyContext';
+import { WeavyProvider } from './contexts/WeavyContext';
 import ChatPage from './pages/Chat/ChatPage';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Settings from './pages/Settings/Settings';
@@ -21,90 +22,92 @@ function App() {
   return (
     <BrowserRouter>
       <AblyProvider>
-        <Layout>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/creator-signup" element={<CreatorSignup />} />
-            <Route path="/member-signup" element={<MemberSignup />} />
+        <WeavyProvider>
+          <Layout>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/creator-signup" element={<CreatorSignup />} />
+              <Route path="/member-signup" element={<MemberSignup />} />
 
-            {/* Protected routes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/chat" 
-              element={
-                <ProtectedRoute>
-                  <ChatPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/creator/:id" 
-              element={
-                <ProtectedRoute>
-                  <CreatorProfile />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected routes */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/chat" 
+                element={
+                  <ProtectedRoute>
+                    <ChatPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/creator/:id" 
+                element={
+                  <ProtectedRoute>
+                    <CreatorProfile />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Creator-only routes */}
-            <Route 
-              path="/creator-dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['creator']}>
-                  <CreatorDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/creator-settings" 
-              element={
-                <ProtectedRoute allowedRoles={['creator']}>
-                  <CreatorSettings />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Creator-only routes */}
+              <Route 
+                path="/creator-dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={['creator']}>
+                    <CreatorDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/creator-settings" 
+                element={
+                  <ProtectedRoute allowedRoles={['creator']}>
+                    <CreatorSettings />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Member-only routes */}
-            <Route 
-              path="/member-dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['member']}>
-                  <MemberDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/member-settings" 
-              element={
-                <ProtectedRoute allowedRoles={['member']}>
-                  <MemberSettings />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Member-only routes */}
+              <Route 
+                path="/member-dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={['member']}>
+                    <MemberDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/member-settings" 
+                element={
+                  <ProtectedRoute allowedRoles={['member']}>
+                    <MemberSettings />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Default route */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* Catch all */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Layout>
+              {/* Default route */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              
+              {/* Catch all */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </Layout>
+        </WeavyProvider>
       </AblyProvider>
     </BrowserRouter>
   );
