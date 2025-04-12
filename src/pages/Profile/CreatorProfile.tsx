@@ -521,11 +521,11 @@ const CreatorProfile: React.FC = () => {
                   leftIcon={<FiMessageCircle />}
                   colorScheme="green"
                   onClick={handleStartChat}
-                  isLoading={startingChat}
-                  isDisabled={!isConnected}
+                  isLoading={startingChat || weavyLoading}
+                  isDisabled={!isConnected || weavyLoading}
                   w="full"
                 >
-                  Start Chat
+                  {weavyLoading ? "Connecting..." : "Start Chat"}
                 </Button>
               </VStack>
             )}

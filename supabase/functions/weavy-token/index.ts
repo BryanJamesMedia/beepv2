@@ -9,6 +9,9 @@ const corsHeaders = {
 const WEAVY_URL = 'https://f5fffafbb27144e7842e0673387775d9.weavy.io';
 const WEAVY_API_KEY = 'wys_273MseFIJj4TOCq2yHbMlb2YR5wDQN3etBGw';
 
+// In-memory token store (in production, use a database)
+const tokenStore = new Map<string, { token: string; expiresAt: number }>();
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -33,6 +36,27 @@ serve(async (req) => {
 
     if (userError || !user) {
       throw userError || new Error('User not found')
+    }
+
+    // Check if we need to refresh the token
+    const url = new URL(req.url);
+    const refresh = url.searchParams.get('refresh') === 'true';
+    
+    // Check for existing valid token
+    if (!refresh) {
+      const existingToken = tokenStore.get(user.id);
+      if (existingToken && existingToken.expiresAt > Date.now() + (5 * 60 * 1000)) { // 5 min buffer
+        return new Response(
+          JSON.stringify({ 
+            token: existingToken.token,
+            expiresIn: Math.floor((existingToken.expiresAt - Date.now()) / 1000)
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
     }
 
     // Step 1: Create/Update Weavy user
@@ -70,9 +94,16 @@ serve(async (req) => {
     }
 
     const { access_token } = await tokenResponse.json()
+    
+    // Store the new token
+    const expiresAt = Date.now() + (3600 * 1000); // 1 hour from now
+    tokenStore.set(user.id, { token: access_token, expiresAt });
 
     return new Response(
-      JSON.stringify({ token: access_token }),
+      JSON.stringify({ 
+        token: access_token,
+        expiresIn: 3600
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
