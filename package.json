@@ -17,6 +17,7 @@
     "@chakra-ui/theme": "^3.4.6",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/supabase-js": "^2.49.4",
     "@types/lodash": "^4.17.16",
     "@weavy/uikit-react": "^27.1.0",
