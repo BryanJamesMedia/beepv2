@@ -2,8 +2,10 @@ import React, { createContext, useContext, ReactNode, useEffect, useState } from
 import { useWeavy } from '@weavy/uikit-react';
 import { useSupabase } from './SupabaseContext';
 
+type WeavyInstance = ReturnType<typeof useWeavy>;
+
 interface WeavyContextType {
-  weavyClient: any;
+  weavyClient: WeavyInstance | null;
   isConnected: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -18,11 +20,6 @@ interface CachedToken {
 interface WeavyConfig {
   url: string;
   tokenFactory: () => Promise<string>;
-}
-
-interface WeavyInstance {
-  weavy: any;
-  error?: Error;
 }
 
 const TOKEN_CACHE_KEY = 'weavy_token_cache';
@@ -51,13 +48,13 @@ function useWeavyChat() {
         throw new Error('Weavy client is not initialized');
       }
 
-      // Create or get existing conversation
-      const conversation = await context.weavyClient.conversation({
-        uid: `chat-${userId}`,
-        type: 'messenger'
-      });
+      // Create a unique chat ID for this conversation
+      const chatId = `chat-${userId}`;
 
-      return conversation;
+      return {
+        type: 'messenger',
+        uid: chatId
+      };
     } catch (error) {
       console.error('Error starting chat:', error);
       throw error;
@@ -126,76 +123,27 @@ function WeavyProvider({ children }: { children: ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        clearCachedToken();
         throw new Error('No active session');
       }
-
-      // If not refreshing, try to use cached token
-      const cachedToken = getCachedToken(session.user.id);
-      if (cachedToken) {
-        return cachedToken.token;
-      }
-
-      // Get new token from backend
-      const response = await fetch('https://nmeducgrjydnzlqkyxtf.supabase.co/functions/v1/weavy-token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch Weavy token');
-      }
-
-      const data = await response.json();
-      
-      // Cache the new token
-      if (data.token && data.expiresIn) {
-        cacheToken(data.token, session.user.id, data.expiresIn);
-      }
-
-      return data.token;
-    } catch (error) {
-      console.error('Error generating Weavy token:', error);
-      setError(error instanceof Error ? error : new Error('Failed to get token'));
-      throw error;
-    }
-  };
-
-  const tokenFactory = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
-      }
       return session.access_token;
-    } catch (err) {
-      const newError = err instanceof Error ? err : new Error('Failed to get token');
-      setError(newError);
+    } catch (error) {
+      console.error('Error getting token:', error);
+      setError(error instanceof Error ? error : new Error('Failed to get token'));
       return null;
     }
   };
 
   const weavyConfig = {
     url: WEAVY_URL,
-    tokenFactory
+    tokenFactory: getValidToken
   };
 
   const weavy = useWeavy(weavyConfig);
 
   useEffect(() => {
     if (weavy) {
-      (weavy as any).on('connected', () => {
-        setIsConnected(true);
-        setIsLoading(false);
-      });
-
-      (weavy as any).on('error', (e: Error) => {
-        setError(e);
-        setIsLoading(false);
-      });
+      setIsConnected(true);
+      setIsLoading(false);
     }
   }, [weavy]);
 
