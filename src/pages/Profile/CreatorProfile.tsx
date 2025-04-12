@@ -23,8 +23,7 @@ import {
 } from '@chakra-ui/react';
 import { FiArrowLeft, FiMapPin, FiBookmark, FiImage, FiInfo, FiMessageCircle } from 'react-icons/fi';
 import { supabase } from '../../config/supabase';
-import { useAbly } from '../../contexts/AblyContext';
-import { generateChatRoomId } from '../../utils/chatUtils';
+import { useWeavyChat } from '../../contexts/WeavyContext';
 
 // Fix the interface to match React Router v6 useParams
 interface CreatorProfileParams {
@@ -51,7 +50,7 @@ const CreatorProfile: React.FC = () => {
   const { id } = useParams<CreatorProfileParams>();
   const navigate = useNavigate();
   const toast = useToast();
-  const { chatClient, isConnected } = useAbly();
+  const { weavyClient, isConnected, isLoading: weavyLoading } = useWeavyChat();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -224,7 +223,7 @@ const CreatorProfile: React.FC = () => {
         return;
       }
       
-      if (!chatClient) {
+      if (!weavyClient) {
         toast({
           title: 'Chat service unavailable',
           description: 'Chat client is not initialized',
@@ -246,10 +245,6 @@ const CreatorProfile: React.FC = () => {
 
       setStartingChat(true);
 
-      // Create a unique room ID using our utility function
-      const roomId = generateChatRoomId(currentUser, profile.id);
-      console.log('Starting chat with roomId:', roomId, 'between', currentUser, 'and', profile.id);
-      
       try {
         // First, check if this chat relationship already exists in the database
         const { data: existingChat, error: checkError } = await supabase
@@ -280,7 +275,6 @@ const CreatorProfile: React.FC = () => {
           const { error: insertError } = await supabase
             .from('chats')
             .insert({
-              id: roomId,
               initiator_id: currentUser,
               participant_id: profile.id,
               initiator_name: currentUserProfile.username,
@@ -298,31 +292,10 @@ const CreatorProfile: React.FC = () => {
           console.log('Chat already exists:', existingChat);
         }
         
-        // Send a notification message in the channel
-        const ablyRealtime = (chatClient as any)._realtimeClient;
-        if (ablyRealtime) {
-          try {
-            const channel = ablyRealtime.channels.get(roomId);
-            await channel.publish('system', {
-              type: 'invitation',
-              text: `Chat started by ${currentUser}`,
-              timestamp: Date.now()
-            });
-            console.log('Invitation message sent');
-          } catch (channelError) {
-            console.error('Error sending invitation message:', channelError);
-          }
-        }
-        
-        // Since getRoom method is not available in this version of Ably Chat SDK,
-        // we'll navigate directly to the chat page with the room information
-        console.log('Chat client available methods:', Object.keys(chatClient));
-        
-        // Navigate to the chat page with the chat info
+        // Navigate to the chat page
         navigate('/chat', {
           state: {
             selectedChat: {
-              id: roomId,
               participantId: profile.id,
               participantName: profile.username
             }
@@ -345,18 +318,23 @@ const CreatorProfile: React.FC = () => {
           errorMessage += `: ${err.message}`;
         }
         
-        throw new Error(errorMessage);
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          status: 'error',
+          duration: 3000,
+        });
+      } finally {
+        setStartingChat(false);
       }
     } catch (error) {
-      console.error('Error starting chat:', error);
+      console.error('Error in handleStartChat:', error);
       toast({
-        title: 'Failed to start chat',
-        description: error instanceof Error ? error.message : 'Could not initialize chat session',
+        title: 'Error',
+        description: 'An unexpected error occurred',
         status: 'error',
-        duration: 5000,
-        isClosable: true,
+        duration: 3000,
       });
-    } finally {
       setStartingChat(false);
     }
   };

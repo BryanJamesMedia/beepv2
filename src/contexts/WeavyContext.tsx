@@ -1,10 +1,12 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useWeavy, WeavyClient } from '@weavy/uikit-react';
+import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
+import { useWeavy } from '@weavy/uikit-react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 
 interface WeavyContextType {
-  weavyClient: WeavyClient;
+  weavyClient: any;
   isConnected: boolean;
+  isLoading: boolean;
+  error: Error | null;
 }
 
 const WeavyContext = createContext<WeavyContextType | undefined>(undefined);
@@ -12,8 +14,10 @@ const WeavyContext = createContext<WeavyContextType | undefined>(undefined);
 export function WeavyProvider({ children }: { children: ReactNode }) {
   const WEAVY_URL = import.meta.env.VITE_WEAVY_URL;
   const supabaseClient = useSupabaseClient();
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const { weavy, isConnected } = useWeavy({
+  const weavyConfig = {
     url: WEAVY_URL,
     tokenFactory: async () => {
       try {
@@ -39,13 +43,42 @@ export function WeavyProvider({ children }: { children: ReactNode }) {
         return token;
       } catch (error) {
         console.error('Error generating Weavy token:', error);
+        setError(error as Error);
         throw error;
       }
     }
-  });
+  };
+
+  const weavyResult = useWeavy(weavyConfig);
+
+  useEffect(() => {
+    if (weavyResult) {
+      setIsLoading(false);
+    }
+  }, [weavyResult]);
+
+  if (!weavyResult) {
+    return (
+      <WeavyContext.Provider value={{ 
+        weavyClient: null, 
+        isConnected: false, 
+        isLoading: true,
+        error 
+      }}>
+        {children}
+      </WeavyContext.Provider>
+    );
+  }
+
+  const { weavy, isConnected } = weavyResult;
 
   return (
-    <WeavyContext.Provider value={{ weavyClient: weavy, isConnected }}>
+    <WeavyContext.Provider value={{ 
+      weavyClient: weavy, 
+      isConnected, 
+      isLoading,
+      error 
+    }}>
       {children}
     </WeavyContext.Provider>
   );
