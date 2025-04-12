@@ -19,6 +19,7 @@
     "@emotion/styled": "^11.14.0",
     "@supabase/supabase-js": "^2.49.4",
     "@types/lodash": "^4.17.16",
+    "@weavy/uikit-react": "^27.1.0",
     "framer-motion": "^12.6.3",
     "lodash": "^4.17.21",
     "qrcode.react": "^4.2.0",

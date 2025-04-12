@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Box, VStack, Text, Button, useToast } from '@chakra-ui/react';
-import { useWeavyChat } from '../../contexts/WeavyContext';
-import { WyChat } from '@weavy/uikit-react';
-import { supabase } from '../../config/supabase';
+import { useWeavyChat } from '../contexts/WeavyContext';
+import { WyChatList } from '@weavy/uikit-react';
+import { supabase } from '../config/supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-interface ChatRoomProps {
-  chatId: string;
-  otherUserId: string;
-  otherUserName: string;
+interface ChatMember {
+  id: string;
+  name: string;
 }
 
-export function ChatRoom({ chatId, otherUserId, otherUserName }: ChatRoomProps) {
+interface Chat {
+  uid: string;
+  members: ChatMember[];
+}
+
+export function ChatPage() {
   const { weavyClient, isConnected } = useWeavyChat();
   const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!isConnected) {
@@ -39,15 +46,20 @@ export function ChatRoom({ chatId, otherUserId, otherUserName }: ChatRoomProps) 
     <Box p={4} h="100%">
       <VStack spacing={4} h="100%">
         <Text fontSize="xl" fontWeight="bold">
-          Chat with {otherUserName}
+          Your Chats
         </Text>
         <Box flex={1} w="100%">
-          <WyChat
+          <WyChatList
             client={weavyClient}
-            uid={chatId}
-            options={{
-              members: [otherUserId],
-              title: `Chat with ${otherUserName}`,
+            onChatSelect={(chat: Chat) => {
+              // Navigate to the selected chat
+              navigate(`/chat/${chat.uid}`, {
+                state: {
+                  chatId: chat.uid,
+                  otherUserId: chat.members[0].id,
+                  otherUserName: chat.members[0].name
+                }
+              });
             }}
           />
         </Box>
