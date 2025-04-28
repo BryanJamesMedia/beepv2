@@ -1,16 +1,16 @@
-import * as Ably from 'ably';
-import { ChatClient, ChatClientProvider, ChatRoomProvider, RoomOptionsDefaults } from '@ably/chat';
+// import * as Ably from 'ably';
+// import { ChatClient, ChatClientProvider, ChatRoomProvider, RoomOptionsDefaults } from '@ably/chat';
 import { Messages } from './Messages';
 
 // Initialize an Ably Realtime client, which we'll use to power the chat client
 // Note: in production, you should use tokens for authentication, rather than a key.
-const ablyClient = new Ably.Realtime({
-  clientId: 'ably-chat',
-  key: "NG-WuQ.Vu-PjQ:PobNc11IPxjtkjRtIvD2ElwE8fn_MzoT7VOy_Ji56gc"
-});
+// const ablyClient = new Ably.Realtime({
+//   clientId: 'ably-chat',
+//   key: "NG-WuQ.Vu-PjQ:PobNc11IPxjtkjRtIvD2ElwE8fn_MzoT7VOy_Ji56gc"
+// });
 
 // Create the chat client
-const chatClient = new ChatClient(ablyClient, {});
+// const chatClient = new ChatClient(ablyClient, {});
 
 // This an example App component that uses the chat client to power a chat UI. Your app will likely be
 // much different to this.
